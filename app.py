@@ -215,7 +215,8 @@ fig.update_layout(
 
 st.plotly_chart(
     fig,
-    use_container_width=True
+    use_container_width=True,
+    key="environmental_risk_map"
 )
 
 # =========================================================
