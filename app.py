@@ -22,93 +22,89 @@ st.set_page_config(
 st.markdown("""
 <style>
 
-.stApp {
-    background: #eef4f7;
-}
-
-[data-testid="stSidebar"] {
-    background: #102a43;
-}
-
-[data-testid="stSidebar"] * {
-    color: white !important;
+.main {
+    background-color: #f5f7fa;
+    color: #000000;
 }
 
 .block-container {
-    padding-top: 1.5rem;
+    padding-top: 2rem;
     padding-bottom: 2rem;
-    max-width: 1500px;
 }
 
-h1 {
-    color: #102a43;
-    font-weight: 800;
+/* Main text */
+p, li, span, div {
+    color: #000000;
 }
 
-h2, h3 {
-    color: #243b53;
+/* Headings */
+h1, h2, h3, h4, h5, h6 {
+    color: #000000 !important;
 }
 
-.dashboard-card {
-    background: white;
-    padding: 18px;
-    border-radius: 14px;
-    border: 1px solid #d9e2ec;
-    box-shadow: 0 2px 8px rgba(16, 42, 67, 0.06);
+/* Captions */
+.stCaption,
+.stCaption p {
+    color: #000000 !important;
 }
 
-.metric-title {
-    color: #627d98;
-    font-size: 0.85rem;
-    font-weight: 600;
+/* Metrics */
+[data-testid="stMetricLabel"] {
+    color: #000000 !important;
 }
 
-.metric-value {
-    color: #102a43;
-    font-size: 1.65rem;
-    font-weight: 800;
-    margin-top: 4px;
+[data-testid="stMetricValue"] {
+    color: #000000 !important;
 }
 
-.metric-sub {
-    color: #829ab1;
-    font-size: 0.8rem;
+[data-testid="stMetricDelta"] {
+    color: #000000 !important;
 }
 
+/* Sidebar */
+section[data-testid="stSidebar"] {
+    background-color: #ffffff;
+}
+
+section[data-testid="stSidebar"] * {
+    color: #000000 !important;
+}
+
+/* Buttons */
+.stButton button {
+    color: #000000 !important;
+}
+
+/* Input labels */
+label {
+    color: #000000 !important;
+}
+
+/* Input text */
+input {
+    color: #000000 !important;
+}
+
+/* Risk cards */
 .risk-high {
-    background: #fff1f0;
-    border-left: 6px solid #d64545;
+    background: #fee2e2;
     padding: 18px;
-    border-radius: 10px;
+    border-radius: 12px;
+    text-align: center;
 }
 
 .risk-medium {
-    background: #fff8e6;
-    border-left: 6px solid #f0a202;
+    background: #fef3c7;
     padding: 18px;
-    border-radius: 10px;
+    border-radius: 12px;
+    text-align: center;
 }
 
 .risk-low {
-    background: #edf8f1;
-    border-left: 6px solid #2f855a;
+    background: #dcfce7;
     padding: 18px;
-    border-radius: 10px;
-}
-
-.section-label {
-    color: #486581;
-    font-size: 0.85rem;
-    font-weight: 700;
-    letter-spacing: 0.08em;
-    text-transform: uppercase;
-}
-
-.info-box {
-    background: white;
-    padding: 15px;
     border-radius: 12px;
-    border: 1px solid #d9e2ec;
+    text-align: center;
 }
 
 </style>
