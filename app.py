@@ -193,18 +193,13 @@ if show_risk:
     )
 
 fig.update_geos(
-    projection_type="polar",
-    projection_rotation=dict(
-        lon=0,
-        lat=-90
-    ),
-    lataxis_range=[-90, -48],
+    projection_type="stereographic",
+    center=dict(lat=-90, lon=0),
+    projection_rotation=dict(lon=0, lat=0, roll=0),
     showland=True,
     showocean=True,
-    showcountries=True,
     showcoastlines=True
 )
-
 fig.update_layout(
     height=600,
     margin=dict(
