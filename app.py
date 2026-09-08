@@ -2,7 +2,6 @@ import streamlit as st
 import pandas as pd
 import numpy as np
 import plotly.graph_objects as go
-import plotly.express as px
 
 # =========================================================
 # PAGE CONFIG
@@ -16,95 +15,381 @@ st.set_page_config(
 )
 
 # =========================================================
-# THEME / CSS
+# CUSTOM CSS — BLUE ANTARCTIC THEME
 # =========================================================
 
 st.markdown("""
 <style>
 
+/* =====================================================
+   GLOBAL
+   ===================================================== */
+
+.stApp {
+    background:
+        radial-gradient(
+            circle at 10% 0%,
+            rgba(147, 197, 253, 0.45),
+            transparent 32%
+        ),
+        radial-gradient(
+            circle at 90% 10%,
+            rgba(191, 219, 254, 0.55),
+            transparent 30%
+        ),
+        linear-gradient(
+            135deg,
+            #eaf6ff 0%,
+            #dbeafe 45%,
+            #eff8ff 100%
+        );
+    color: #102a43;
+}
+
 .main {
-    background-color: #f5f7fa;
-    color: #000000;
+    background: transparent;
+    color: #102a43;
 }
 
 .block-container {
     padding-top: 2rem;
     padding-bottom: 2rem;
+    max-width: 1450px;
 }
 
-/* Main text */
-p, li, span, div {
-    color: #000000;
-}
+/* =====================================================
+   TEXT
+   ===================================================== */
 
-/* Headings */
 h1, h2, h3, h4, h5, h6 {
-    color: #000000 !important;
+    color: #0b2545 !important;
+    font-weight: 700 !important;
 }
 
-/* Captions */
+p, li, label {
+    color: #183b56 !important;
+}
+
 .stCaption,
 .stCaption p {
-    color: #000000 !important;
+    color: #486581 !important;
 }
 
-/* Metrics */
-[data-testid="stMetricLabel"] {
-    color: #000000 !important;
+/* =====================================================
+   HEADER
+   ===================================================== */
+
+.hero-title {
+    background:
+        linear-gradient(
+            90deg,
+            #082f49,
+            #075985,
+            #0e7490
+        );
+    -webkit-background-clip: text;
+    -webkit-text-fill-color: transparent;
+    font-size: 2.7rem;
+    font-weight: 800;
+    letter-spacing: -1px;
+    margin-bottom: 0.2rem;
 }
 
-[data-testid="stMetricValue"] {
-    color: #000000 !important;
+.hero-subtitle {
+    color: #486581 !important;
+    font-size: 1.05rem;
+    margin-bottom: 1rem;
 }
 
-[data-testid="stMetricDelta"] {
-    color: #000000 !important;
+/* =====================================================
+   DIVIDERS
+   ===================================================== */
+
+hr {
+    border: none;
+    height: 1px;
+    background: linear-gradient(
+        90deg,
+        transparent,
+        #93c5fd,
+        #2563eb,
+        #93c5fd,
+        transparent
+    );
 }
 
-/* Sidebar */
+/* =====================================================
+   SIDEBAR
+   ===================================================== */
+
 section[data-testid="stSidebar"] {
-    background-color: #ffffff;
+    background:
+        linear-gradient(
+            180deg,
+            #dbeafe 0%,
+            #e0f2fe 45%,
+            #bfdbfe 100%
+        );
+    border-right: 1px solid rgba(37, 99, 235, 0.20);
 }
 
 section[data-testid="stSidebar"] * {
-    color: #000000 !important;
+    color: #102a43 !important;
 }
 
-/* Buttons */
-.stButton button {
-    color: #000000 !important;
+section[data-testid="stSidebar"] h1,
+section[data-testid="stSidebar"] h2,
+section[data-testid="stSidebar"] h3 {
+    color: #082f49 !important;
 }
 
-/* Input labels */
-label {
-    color: #000000 !important;
+/* =====================================================
+   SIDEBAR CHECKBOXES
+   ===================================================== */
+
+[data-testid="stSidebar"] [data-testid="stCheckbox"] label {
+    color: #183b56 !important;
+    font-weight: 500;
 }
 
-/* Input text */
-input {
-    color: #000000 !important;
+/* =====================================================
+   METRIC CARDS
+   ===================================================== */
+
+[data-testid="stMetric"] {
+    background:
+        linear-gradient(
+            145deg,
+            rgba(255,255,255,0.90),
+            rgba(219,234,254,0.88)
+        );
+    border: 1px solid rgba(59, 130, 246, 0.18);
+    border-radius: 16px;
+    padding: 18px 20px;
+    box-shadow:
+        0 8px 24px rgba(30, 64, 175, 0.10);
 }
 
-/* Risk cards */
+[data-testid="stMetricLabel"] {
+    color: #486581 !important;
+    font-weight: 600 !important;
+}
+
+[data-testid="stMetricValue"] {
+    color: #082f49 !important;
+    font-weight: 800 !important;
+}
+
+[data-testid="stMetricDelta"] {
+    color: #075985 !important;
+}
+
+/* =====================================================
+   GENERAL CARDS
+   ===================================================== */
+
+.info-card {
+    background:
+        linear-gradient(
+            145deg,
+            rgba(255,255,255,0.95),
+            rgba(224,242,254,0.92)
+        );
+    border: 1px solid rgba(59,130,246,0.18);
+    border-radius: 18px;
+    padding: 22px;
+    box-shadow:
+        0 10px 30px rgba(30,64,175,0.10);
+}
+
+/* =====================================================
+   SECTION HEADER
+   ===================================================== */
+
+.section-header {
+    background:
+        linear-gradient(
+            90deg,
+            rgba(255,255,255,0.75),
+            rgba(219,234,254,0.65)
+        );
+    border-left: 5px solid #2563eb;
+    border-radius: 10px;
+    padding: 10px 16px;
+    margin-top: 10px;
+    margin-bottom: 16px;
+}
+
+.section-header h3 {
+    margin: 0;
+    color: #082f49 !important;
+}
+
+/* =====================================================
+   RISK CARDS
+   ===================================================== */
+
 .risk-high {
-    background: #fee2e2;
-    padding: 18px;
-    border-radius: 12px;
+    background:
+        linear-gradient(
+            135deg,
+            #fee2e2,
+            #fecaca
+        );
+    border: 1px solid #fca5a5;
+    color: #7f1d1d !important;
+    padding: 20px;
+    border-radius: 16px;
     text-align: center;
+    box-shadow: 0 8px 20px rgba(127,29,29,0.10);
+}
+
+.risk-high h2,
+.risk-high h3 {
+    color: #7f1d1d !important;
 }
 
 .risk-medium {
-    background: #fef3c7;
-    padding: 18px;
-    border-radius: 12px;
+    background:
+        linear-gradient(
+            135deg,
+            #fef3c7,
+            #fde68a
+        );
+    border: 1px solid #fcd34d;
+    color: #78350f !important;
+    padding: 20px;
+    border-radius: 16px;
     text-align: center;
+    box-shadow: 0 8px 20px rgba(120,53,15,0.10);
+}
+
+.risk-medium h2,
+.risk-medium h3 {
+    color: #78350f !important;
 }
 
 .risk-low {
-    background: #dcfce7;
-    padding: 18px;
-    border-radius: 12px;
+    background:
+        linear-gradient(
+            135deg,
+            #dcfce7,
+            #bbf7d0
+        );
+    border: 1px solid #86efac;
+    color: #14532d !important;
+    padding: 20px;
+    border-radius: 16px;
     text-align: center;
+    box-shadow: 0 8px 20px rgba(20,83,45,0.10);
+}
+
+.risk-low h2,
+.risk-low h3 {
+    color: #14532d !important;
+}
+
+/* =====================================================
+   BUTTONS
+   ===================================================== */
+
+.stButton > button {
+    background:
+        linear-gradient(
+            135deg,
+            #0c4a6e,
+            #075985,
+            #0369a1
+        );
+    color: white !important;
+    border: none;
+    border-radius: 10px;
+    padding: 0.6rem 1rem;
+    font-weight: 700;
+    box-shadow:
+        0 5px 15px rgba(3,105,161,0.25);
+    transition: all 0.2s ease;
+}
+
+.stButton > button:hover {
+    background:
+        linear-gradient(
+            135deg,
+            #075985,
+            #0284c7,
+            #0369a1
+        );
+    color: white !important;
+    transform: translateY(-1px);
+    box-shadow:
+        0 8px 20px rgba(3,105,161,0.30);
+}
+
+/* =====================================================
+   INPUT BOXES
+   ===================================================== */
+
+input {
+    color: #102a43 !important;
+}
+
+[data-baseweb="input"] {
+    background-color: rgba(255,255,255,0.90) !important;
+    border-radius: 10px !important;
+}
+
+[data-baseweb="select"] {
+    background-color: rgba(255,255,255,0.90) !important;
+}
+
+[data-baseweb="select"] * {
+    color: #102a43 !important;
+}
+
+/* =====================================================
+   SLIDER
+   ===================================================== */
+
+[data-testid="stSlider"] label {
+    color: #183b56 !important;
+    font-weight: 600;
+}
+
+/* =====================================================
+   ALERTS
+   ===================================================== */
+
+[data-testid="stAlert"] {
+    border-radius: 12px;
+}
+
+/* =====================================================
+   MAP CONTAINER
+   ===================================================== */
+
+.map-container {
+    background:
+        linear-gradient(
+            145deg,
+            rgba(255,255,255,0.92),
+            rgba(219,234,254,0.82)
+        );
+    border-radius: 18px;
+    border: 1px solid rgba(37,99,235,0.16);
+    padding: 8px;
+    box-shadow:
+        0 12px 35px rgba(30,64,175,0.12);
+}
+
+/* =====================================================
+   FOOTER
+   ===================================================== */
+
+.footer {
+    text-align: center;
+    color: #486581 !important;
+    padding: 20px;
+    font-size: 0.9rem;
 }
 
 </style>
@@ -116,15 +401,16 @@ input {
 # =========================================================
 
 st.markdown(
-    '<div class="section-label">ANTARCTIC ENVIRONMENTAL MONITORING</div>',
+    '<div class="hero-title">🧊 Antarctica Environmental Risk Explorer</div>',
     unsafe_allow_html=True
 )
 
-st.title("🧊 Antarctica Risk Explorer")
-
 st.markdown(
-    "A unified view of marine conditions, sea ice and seabed characteristics "
-    "for environmental risk assessment."
+    '<div class="hero-subtitle">'
+    'Explore Antarctic marine, ice and seabed conditions '
+    'to identify environmentally sensitive areas.'
+    '</div>',
+    unsafe_allow_html=True
 )
 
 st.divider()
@@ -134,79 +420,96 @@ st.divider()
 # SIDEBAR
 # =========================================================
 
-st.sidebar.markdown("## 🧊 Antarctica")
-st.sidebar.caption("Environmental Risk Explorer")
-
-st.sidebar.divider()
-
-st.sidebar.markdown("### Navigation")
-
-page = st.sidebar.radio(
-    "Go to",
-    [
-        "Overview",
-        "Risk Map",
-        "Ocean Conditions",
-        "Ice Conditions",
-        "Seabed & Bathymetry",
-        "Location Assessment",
-        "Safer Route"
-    ],
-    label_visibility="collapsed"
-)
-
-st.sidebar.divider()
-
-st.sidebar.markdown("### Map Layers")
+st.sidebar.markdown("## 🗺️ Map Layers")
 
 show_risk = st.sidebar.checkbox(
-    "🔴 Environmental Risk",
+    "Risk",
     True
 )
 
 show_sea_ice = st.sidebar.checkbox(
-    "❄️ Sea Ice",
+    "Sea Ice Concentration",
     False
 )
 
 show_icebergs = st.sidebar.checkbox(
-    "🧊 Icebergs",
+    "Icebergs",
     False
 )
 
 show_currents = st.sidebar.checkbox(
-    "🌊 Ocean Currents",
+    "Ocean Currents",
     False
 )
 
 show_bathymetry = st.sidebar.checkbox(
-    "🏔️ Bathymetry",
+    "Bathymetry",
     False
 )
 
 st.sidebar.divider()
 
-st.sidebar.markdown("### Risk Settings")
+st.sidebar.markdown("## ⚙️ Risk Settings")
 
 risk_threshold = st.sidebar.slider(
     "Risk threshold",
-    min_value=0,
-    max_value=100,
-    value=60
+    0,
+    100,
+    60
 )
 
-st.sidebar.divider()
 
-st.sidebar.caption(
-    "Data sources are being progressively integrated into the platform."
+# =========================================================
+# TOP STATUS
+# =========================================================
+
+c1, c2, c3, c4 = st.columns(4)
+
+with c1:
+    st.metric(
+        "Region",
+        "Antarctica"
+    )
+
+with c2:
+    st.metric(
+        "Overall Risk",
+        "HIGH"
+    )
+
+with c3:
+    st.metric(
+        "Risk Score",
+        "72 / 100"
+    )
+
+with c4:
+    st.metric(
+        "Active Layers",
+        sum([
+            show_risk,
+            show_sea_ice,
+            show_icebergs,
+            show_currents,
+            show_bathymetry
+        ])
+    )
+
+
+# =========================================================
+# MAP SECTION
+# =========================================================
+
+st.divider()
+
+st.markdown(
+    '<div class="section-header"><h3>🗺️ Environmental Risk Map</h3></div>',
+    unsafe_allow_html=True
 )
-
 
 # =========================================================
 # DEMO DATA
 # =========================================================
-# These values keep the dashboard functional while the real
-# datasets are connected.
 
 lat = np.array([
     -65, -66, -67, -68, -69,
@@ -223,615 +526,153 @@ risk = np.array([
     67, 45, 76, 88, 52
 ])
 
-sea_ice = np.array([
-    72, 78, 81, 86, 91,
-    88, 79, 83, 94, 76
-])
-
-current_speed = np.array([
-    0.31, 0.45, 0.52, 0.61, 0.74,
-    0.68, 0.39, 0.82, 0.91, 0.55
-])
-
-bed_depth = np.array([
-    -2100, -2800, -3400, -4200, -2431,
-    -5100, -3700, -4600, -5900, -3100
-])
-
 
 # =========================================================
-# HELPER FUNCTIONS
+# CREATE MAP
 # =========================================================
 
-def create_risk_map():
+fig = go.Figure()
 
-    fig = go.Figure()
+if show_risk:
 
-    if show_risk:
-
-        fig.add_trace(
-            go.Scattergeo(
-                lat=lat,
-                lon=lon,
-                mode="markers",
-                marker=dict(
-                    size=14,
-                    color=risk,
-                    colorscale="RdYlGn_r",
-                    cmin=0,
-                    cmax=100,
-                    opacity=0.9,
-                    line=dict(
-                        width=1,
-                        color="white"
+    fig.add_trace(
+        go.Scattergeo(
+            lat=lat,
+            lon=lon,
+            mode="markers",
+            marker=dict(
+                size=13,
+                color=risk,
+                colorscale="RdYlGn_r",
+                cmin=0,
+                cmax=100,
+                line=dict(
+                    width=1,
+                    color="white"
+                ),
+                colorbar=dict(
+                    title=dict(
+                        text="Risk Score",
+                        font=dict(
+                            color="#102a43"
+                        )
                     ),
-                    colorbar=dict(
-                        title="Risk"
+                    tickfont=dict(
+                        color="#102a43"
                     )
-                ),
-                text=[
-                    f"Risk Score: {r}"
-                    for r in risk
-                ],
-                hovertemplate=(
-                    "<b>%{text}</b><br>"
-                    "Latitude: %{lat:.2f}°<br>"
-                    "Longitude: %{lon:.2f}°"
-                    "<extra></extra>"
-                ),
-                name="Environmental Risk"
-            )
+                )
+            ),
+            text=[
+                f"Risk Score: {r}"
+                for r in risk
+            ],
+            hovertemplate=
+                "<b>%{text}</b><br>" +
+                "Latitude: %{lat:.2f}<br>" +
+                "Longitude: %{lon:.2f}<extra></extra>"
         )
-
-    if show_sea_ice:
-
-        fig.add_trace(
-            go.Scattergeo(
-                lat=lat,
-                lon=lon,
-                mode="markers",
-                marker=dict(
-                    size=9,
-                    color=sea_ice,
-                    colorscale="Blues",
-                    cmin=0,
-                    cmax=100,
-                    opacity=0.7
-                ),
-                text=[
-                    f"Sea Ice: {x}%"
-                    for x in sea_ice
-                ],
-                hovertemplate=(
-                    "<b>%{text}</b><br>"
-                    "Latitude: %{lat:.2f}°<br>"
-                    "Longitude: %{lon:.2f}°"
-                    "<extra></extra>"
-                ),
-                name="Sea Ice"
-            )
-        )
-
-    if show_currents:
-
-        fig.add_trace(
-            go.Scattergeo(
-                lat=lat,
-                lon=lon,
-                mode="markers",
-                marker=dict(
-                    size=8,
-                    color=current_speed,
-                    colorscale="Viridis",
-                    cmin=0,
-                    cmax=1
-                ),
-                text=[
-                    f"Current Speed: {x:.2f} m/s"
-                    for x in current_speed
-                ],
-                hovertemplate=(
-                    "<b>%{text}</b><br>"
-                    "Latitude: %{lat:.2f}°<br>"
-                    "Longitude: %{lon:.2f}°"
-                    "<extra></extra>"
-                ),
-                name="Ocean Current"
-            )
-        )
-
-    if show_bathymetry:
-
-        fig.add_trace(
-            go.Scattergeo(
-                lat=lat,
-                lon=lon,
-                mode="markers",
-                marker=dict(
-                    size=9,
-                    color=bed_depth,
-                    colorscale="Cividis",
-                    opacity=0.8
-                ),
-                text=[
-                    f"Bed Depth: {x} m"
-                    for x in bed_depth
-                ],
-                hovertemplate=(
-                    "<b>%{text}</b><br>"
-                    "Latitude: %{lat:.2f}°<br>"
-                    "Longitude: %{lon:.2f}°"
-                    "<extra></extra>"
-                ),
-                name="Bathymetry"
-            )
-        )
-
-    if show_icebergs:
-
-        fig.add_trace(
-            go.Scattergeo(
-                lat=[-67, -69, -71],
-                lon=[-20, 35, 90],
-                mode="markers",
-                marker=dict(
-                    size=10,
-                    symbol="diamond",
-                    opacity=0.8
-                ),
-                text=[
-                    "Iceberg activity",
-                    "Iceberg activity",
-                    "Iceberg activity"
-                ],
-                hovertemplate=(
-                    "<b>%{text}</b><br>"
-                    "Latitude: %{lat:.2f}°<br>"
-                    "Longitude: %{lon:.2f}°"
-                    "<extra></extra>"
-                ),
-                name="Icebergs"
-            )
-        )
-
-    fig.update_geos(
-        projection_type="stereographic",
-        center=dict(
-            lat=-90,
-            lon=0
-        ),
-        showland=True,
-        showocean=True,
-        showcoastlines=True,
-        coastlinecolor="#486581",
-        landcolor="#d9e2ec",
-        oceancolor="#eaf4f8"
-    )
-
-    fig.update_layout(
-        height=650,
-        margin=dict(
-            l=0,
-            r=0,
-            t=20,
-            b=0
-        ),
-        paper_bgcolor="white",
-        geo=dict(
-            bgcolor="white"
-        ),
-        legend=dict(
-            orientation="h",
-            yanchor="bottom",
-            y=0.01,
-            xanchor="left",
-            x=0.01
-        )
-    )
-
-    return fig
-
-
-def risk_category(score):
-
-    if score >= 70:
-        return "HIGH", "risk-high"
-
-    elif score >= 40:
-        return "MODERATE", "risk-medium"
-
-    return "LOW", "risk-low"
-
-
-# =========================================================
-# OVERVIEW
-# =========================================================
-
-if page == "Overview":
-
-    st.markdown(
-        '<div class="section-label">SYSTEM OVERVIEW</div>',
-        unsafe_allow_html=True
-    )
-
-    st.header("Antarctic Environmental Status")
-
-    # -----------------------------------------------------
-    # KPI CARDS
-    # -----------------------------------------------------
-
-    c1, c2, c3, c4 = st.columns(4)
-
-    with c1:
-        st.markdown(
-            """
-            <div class="dashboard-card">
-                <div class="metric-title">OVERALL RISK</div>
-                <div class="metric-value">HIGH</div>
-                <div class="metric-sub">Current assessment</div>
-            </div>
-            """,
-            unsafe_allow_html=True
-        )
-
-    with c2:
-        st.markdown(
-            """
-            <div class="dashboard-card">
-                <div class="metric-title">RISK SCORE</div>
-                <div class="metric-value">72 / 100</div>
-                <div class="metric-sub">Environmental index</div>
-            </div>
-            """,
-            unsafe_allow_html=True
-        )
-
-    with c3:
-        st.markdown(
-            """
-            <div class="dashboard-card">
-                <div class="metric-title">SEA ICE</div>
-                <div class="metric-value">82%</div>
-                <div class="metric-sub">Regional concentration</div>
-            </div>
-            """,
-            unsafe_allow_html=True
-        )
-
-    with c4:
-        st.markdown(
-            """
-            <div class="dashboard-card">
-                <div class="metric-title">CURRENT SPEED</div>
-                <div class="metric-value">0.74 m/s</div>
-                <div class="metric-sub">Representative value</div>
-            </div>
-            """,
-            unsafe_allow_html=True
-        )
-
-    st.write("")
-
-    # -----------------------------------------------------
-    # MAP
-    # -----------------------------------------------------
-
-    st.subheader("🗺️ Environmental Risk Map")
-
-    fig = create_risk_map()
-
-    st.plotly_chart(
-        fig,
-        use_container_width=True,
-        key="overview_risk_map"
-    )
-
-    st.divider()
-
-    # -----------------------------------------------------
-    # DATASET STATUS
-    # -----------------------------------------------------
-
-    st.subheader("📡 Environmental Data")
-
-    c1, c2, c3, c4 = st.columns(4)
-
-    with c1:
-        st.markdown(
-            """
-            <div class="info-box">
-            <b>🌊 Ocean Current</b><br>
-            <small>Integrated</small>
-            </div>
-            """,
-            unsafe_allow_html=True
-        )
-
-    with c2:
-        st.markdown(
-            """
-            <div class="info-box">
-            <b>❄️ Sea Ice</b><br>
-            <small>Integrated</small>
-            </div>
-            """,
-            unsafe_allow_html=True
-        )
-
-    with c3:
-        st.markdown(
-            """
-            <div class="info-box">
-            <b>🏔️ Geography & Bathymetry</b><br>
-            <small>Integrated</small>
-            </div>
-            """,
-            unsafe_allow_html=True
-        )
-
-    with c4:
-        st.markdown(
-            """
-            <div class="info-box">
-            <b>🧊 Iceberg</b><br>
-            <small>Dataset pending</small>
-            </div>
-            """,
-            unsafe_allow_html=True
-        )
-
-
-# =========================================================
-# RISK MAP
-# =========================================================
-
-elif page == "Risk Map":
-
-    st.markdown(
-        '<div class="section-label">SPATIAL ANALYSIS</div>',
-        unsafe_allow_html=True
-    )
-
-    st.header("🗺️ Environmental Risk Map")
-
-    st.caption(
-        "Toggle environmental layers from the sidebar to compare "
-        "different Antarctic conditions."
-    )
-
-    fig = create_risk_map()
-
-    st.plotly_chart(
-        fig,
-        use_container_width=True,
-        key="risk_map"
-    )
-
-    st.subheader("Risk Distribution")
-
-    high = np.sum(risk >= 70)
-    moderate = np.sum((risk >= 40) & (risk < 70))
-    low = np.sum(risk < 40)
-
-    c1, c2, c3 = st.columns(3)
-
-    with c1:
-        st.metric("🔴 High Risk Areas", high)
-
-    with c2:
-        st.metric("🟠 Moderate Risk Areas", moderate)
-
-    with c3:
-        st.metric("🟢 Low Risk Areas", low)
-
-
-# =========================================================
-# OCEAN CONDITIONS
-# =========================================================
-
-elif page == "Ocean Conditions":
-
-    st.markdown(
-        '<div class="section-label">MARINE CONDITIONS</div>',
-        unsafe_allow_html=True
-    )
-
-    st.header("🌊 Ocean Conditions")
-
-    c1, c2, c3 = st.columns(3)
-
-    with c1:
-        st.metric(
-            "Current Speed",
-            "0.74 m/s"
-        )
-
-    with c2:
-        st.metric(
-            "Maximum Observed",
-            f"{current_speed.max():.2f} m/s"
-        )
-
-    with c3:
-        st.metric(
-            "Minimum Observed",
-            f"{current_speed.min():.2f} m/s"
-        )
-
-    st.write("")
-
-    current_df = pd.DataFrame({
-        "Latitude": lat,
-        "Longitude": lon,
-        "Current Speed (m/s)": current_speed
-    })
-
-    fig = px.scatter(
-        current_df,
-        x="Longitude",
-        y="Latitude",
-        size="Current Speed (m/s)",
-        color="Current Speed (m/s)",
-        color_continuous_scale="Viridis",
-        title="Ocean Current Intensity"
-    )
-
-    fig.update_layout(
-        height=550,
-        paper_bgcolor="white",
-        plot_bgcolor="white"
-    )
-
-    st.plotly_chart(
-        fig,
-        use_container_width=True,
-        key="ocean_current_chart"
-    )
-
-    st.dataframe(
-        current_df,
-        use_container_width=True,
-        hide_index=True
     )
 
 
 # =========================================================
-# ICE CONDITIONS
+# MAP STYLE
 # =========================================================
 
-elif page == "Ice Conditions":
+fig.update_geos(
+    projection_type="stereographic",
+    center=dict(
+        lat=-90,
+        lon=0
+    ),
+    projection_rotation=dict(
+        lon=0,
+        lat=0,
+        roll=0
+    ),
+    showland=True,
+    landcolor="#dbeafe",
+    showocean=True,
+    oceancolor="#e0f2fe",
+    showcoastlines=True,
+    coastlinecolor="#2563eb",
+    coastlinewidth=1.2,
+    showcountries=False,
+    showlakes=True,
+    lakecolor="#bfdbfe",
+    bgcolor="#eff8ff"
+)
 
-    st.markdown(
-        '<div class="section-label">CRYOSPHERE</div>',
-        unsafe_allow_html=True
+fig.update_layout(
+    height=600,
+    margin=dict(
+        l=0,
+        r=0,
+        t=0,
+        b=0
+    ),
+    paper_bgcolor="rgba(255,255,255,0.0)",
+    plot_bgcolor="rgba(255,255,255,0.0)",
+    font=dict(
+        color="#102a43"
     )
+)
 
-    st.header("❄️ Ice Conditions")
+st.markdown(
+    '<div class="map-container">',
+    unsafe_allow_html=True
+)
 
-    c1, c2, c3 = st.columns(3)
+st.plotly_chart(
+    fig,
+    use_container_width=True,
+    key="environmental_risk_map"
+)
 
-    with c1:
-        st.metric(
-            "Average Sea Ice",
-            f"{sea_ice.mean():.1f}%"
-        )
-
-    with c2:
-        st.metric(
-            "Maximum",
-            f"{sea_ice.max():.1f}%"
-        )
-
-    with c3:
-        st.metric(
-            "Minimum",
-            f"{sea_ice.min():.1f}%"
-        )
-
-    st.write("")
-
-    ice_df = pd.DataFrame({
-        "Latitude": lat,
-        "Longitude": lon,
-        "Sea Ice Concentration (%)": sea_ice
-    })
-
-    fig = px.scatter(
-        ice_df,
-        x="Longitude",
-        y="Latitude",
-        size="Sea Ice Concentration (%)",
-        color="Sea Ice Concentration (%)",
-        color_continuous_scale="Blues",
-        title="Sea Ice Concentration"
-    )
-
-    fig.update_layout(
-        height=550,
-        paper_bgcolor="white",
-        plot_bgcolor="white"
-    )
-
-    st.plotly_chart(
-        fig,
-        use_container_width=True,
-        key="sea_ice_chart"
-    )
-
-    st.dataframe(
-        ice_df,
-        use_container_width=True,
-        hide_index=True
-    )
+st.markdown(
+    '</div>',
+    unsafe_allow_html=True
+)
 
 
 # =========================================================
-# SEABED & BATHYMETRY
+# ENVIRONMENTAL CONDITIONS
 # =========================================================
 
-elif page == "Seabed & Bathymetry":
+st.divider()
 
-    st.markdown(
-        '<div class="section-label">SUBSURFACE ANALYSIS</div>',
-        unsafe_allow_html=True
+st.markdown(
+    '<div class="section-header"><h3>🌍 Environmental Conditions</h3></div>',
+    unsafe_allow_html=True
+)
+
+c1, c2, c3, c4 = st.columns(4)
+
+with c1:
+
+    st.metric(
+        "Sea Ice Concentration",
+        "82%"
     )
 
-    st.header("🏔️ Seabed & Bathymetry")
+with c2:
 
-    c1, c2, c3 = st.columns(3)
-
-    with c1:
-        st.metric(
-            "Deepest Bed",
-            f"{bed_depth.min():,.0f} m"
-        )
-
-    with c2:
-        st.metric(
-            "Shallowest Bed",
-            f"{bed_depth.max():,.0f} m"
-        )
-
-    with c3:
-        st.metric(
-            "Mean Bed Depth",
-            f"{bed_depth.mean():,.0f} m"
-        )
-
-    st.write("")
-
-    bathy_df = pd.DataFrame({
-        "Latitude": lat,
-        "Longitude": lon,
-        "Bed Depth (m)": bed_depth
-    })
-
-    fig = px.scatter(
-        bathy_df,
-        x="Longitude",
-        y="Latitude",
-        size=np.abs(bed_depth),
-        color="Bed Depth (m)",
-        color_continuous_scale="Cividis",
-        title="Antarctic Bed Depth"
+    st.metric(
+        "Ocean Current",
+        "0.74 m/s"
     )
 
-    fig.update_layout(
-        height=550,
-        paper_bgcolor="white",
-        plot_bgcolor="white"
+with c3:
+
+    st.metric(
+        "Iceberg Activity",
+        "HIGH"
     )
 
-    st.plotly_chart(
-        fig,
-        use_container_width=True,
-        key="bathymetry_chart"
-    )
+with c4:
 
-    st.dataframe(
-        bathy_df,
-        use_container_width=True,
-        hide_index=True
+    st.metric(
+        "Bed Depth",
+        "-2,431 m"
     )
 
 
@@ -839,312 +680,188 @@ elif page == "Seabed & Bathymetry":
 # LOCATION ASSESSMENT
 # =========================================================
 
-elif page == "Location Assessment":
+st.divider()
 
-    st.markdown(
-        '<div class="section-label">POINT-BASED ANALYSIS</div>',
-        unsafe_allow_html=True
+st.markdown(
+    '<div class="section-header"><h3>📍 Location Assessment</h3></div>',
+    unsafe_allow_html=True
+)
+
+c1, c2, c3 = st.columns([1, 1, 1])
+
+with c1:
+
+    latitude = st.number_input(
+        "Latitude",
+        min_value=-90.0,
+        max_value=-48.0,
+        value=-65.0,
+        step=0.1
     )
 
-    st.header("📍 Location Assessment")
+with c2:
 
-    st.caption(
-        "Enter a coordinate to obtain an environmental risk assessment."
+    longitude = st.number_input(
+        "Longitude",
+        min_value=-180.0,
+        max_value=180.0,
+        value=20.0,
+        step=0.1
     )
 
-    c1, c2 = st.columns(2)
+with c3:
 
-    with c1:
-
-        latitude = st.number_input(
-            "Latitude",
-            min_value=-90.0,
-            max_value=-48.0,
-            value=-65.0,
-            step=0.1
-        )
-
-    with c2:
-
-        longitude = st.number_input(
-            "Longitude",
-            min_value=-180.0,
-            max_value=180.0,
-            value=20.0,
-            step=0.1
-        )
+    st.write("")
+    st.write("")
 
     assess = st.button(
         "🔍 Assess Location",
         use_container_width=True
     )
 
-    if assess:
 
-        # Current demo calculation
-        location_risk = 72
+# =========================================================
+# LOCATION RESULT
+# =========================================================
 
-        category, css_class = risk_category(
-            location_risk
-        )
+if assess:
 
-        st.write("")
+    # Demo calculation
+    # Replace with actual integrated data later
+
+    location_risk = 72
+
+    st.divider()
+
+    st.markdown(
+        f"### Location: {latitude:.2f}°, {longitude:.2f}°"
+    )
+
+    if location_risk >= 70:
 
         st.markdown(
             f"""
-            <div class="{css_class}">
-                <div style="font-size:0.85rem;">
-                    ENVIRONMENTAL RISK
-                </div>
-                <div style="font-size:2rem;font-weight:800;">
-                    {category}
-                </div>
-                <div style="font-size:1.4rem;font-weight:700;">
-                    {location_risk} / 100
-                </div>
+            <div class="risk-high">
+                <h2>🔴 HIGH RISK</h2>
+                <h3>{location_risk} / 100</h3>
             </div>
             """,
             unsafe_allow_html=True
         )
 
-        st.write("")
+    elif location_risk >= 40:
 
         st.markdown(
-            f"### Location: {latitude:.2f}°, {longitude:.2f}°"
+            f"""
+            <div class="risk-medium">
+                <h2>🟠 MODERATE RISK</h2>
+                <h3>{location_risk} / 100</h3>
+            </div>
+            """,
+            unsafe_allow_html=True
         )
 
-        c1, c2, c3, c4 = st.columns(4)
+    else:
 
-        with c1:
-            st.metric(
-                "Sea Ice",
-                "82%"
-            )
-
-        with c2:
-            st.metric(
-                "Current",
-                "0.74 m/s"
-            )
-
-        with c3:
-            st.metric(
-                "Bed Depth",
-                "-2,431 m"
-            )
-
-        with c4:
-            st.metric(
-                "Iceberg Activity",
-                "HIGH"
-            )
-
-        st.divider()
-
-        st.subheader("Why this location is classified as high risk")
-
-        st.write(
-            "• High sea-ice concentration"
+        st.markdown(
+            f"""
+            <div class="risk-low">
+                <h2>🟢 LOW RISK</h2>
+                <h3>{location_risk} / 100</h3>
+            </div>
+            """,
+            unsafe_allow_html=True
         )
 
-        st.write(
-            "• Elevated iceberg activity"
-        )
+    st.markdown("### Why?")
 
-        st.write(
-            "• Strong ocean current"
-        )
+    st.write(
+        "• High sea-ice concentration"
+    )
 
-        st.write(
-            "• Local seabed characteristics"
-        )
+    st.write(
+        "• Elevated iceberg activity"
+    )
+
+    st.write(
+        "• Strong ocean current"
+    )
 
 
 # =========================================================
-# SAFER ROUTE
+# ROUTE PLANNER
 # =========================================================
 
-elif page == "Safer Route":
+st.divider()
 
-    st.markdown(
-        '<div class="section-label">ROUTE PLANNING</div>',
-        unsafe_allow_html=True
+st.markdown(
+    '<div class="section-header"><h3>🧭 Safer Route Planner</h3></div>',
+    unsafe_allow_html=True
+)
+
+st.caption(
+    "Find a lower-risk path between two locations."
+)
+
+c1, c2 = st.columns(2)
+
+with c1:
+
+    st.markdown("**Start Location**")
+
+    start_lat = st.number_input(
+        "Start latitude",
+        min_value=-90.0,
+        max_value=-48.0,
+        value=-65.0,
+        key="start_lat"
     )
 
-    st.header("🧭 Safer Route Planner")
-
-    st.caption(
-        "Compare environmental risk between a start point "
-        "and destination."
+    start_lon = st.number_input(
+        "Start longitude",
+        min_value=-180.0,
+        max_value=180.0,
+        value=0.0,
+        key="start_lon"
     )
 
-    c1, c2 = st.columns(2)
+with c2:
 
-    with c1:
+    st.markdown("**Destination**")
 
-        st.subheader("Start Location")
-
-        start_lat = st.number_input(
-            "Start latitude",
-            min_value=-90.0,
-            max_value=-48.0,
-            value=-65.0,
-            step=0.1,
-            key="start_lat"
-        )
-
-        start_lon = st.number_input(
-            "Start longitude",
-            min_value=-180.0,
-            max_value=180.0,
-            value=0.0,
-            step=0.1,
-            key="start_lon"
-        )
-
-    with c2:
-
-        st.subheader("Destination")
-
-        end_lat = st.number_input(
-            "Destination latitude",
-            min_value=-90.0,
-            max_value=-48.0,
-            value=-70.0,
-            step=0.1,
-            key="end_lat"
-        )
-
-        end_lon = st.number_input(
-            "Destination longitude",
-            min_value=-180.0,
-            max_value=180.0,
-            value=60.0,
-            step=0.1,
-            key="end_lon"
-        )
-
-    route_button = st.button(
-        "🧭 Find Safer Route",
-        use_container_width=True
+    end_lat = st.number_input(
+        "Destination latitude",
+        min_value=-90.0,
+        max_value=-48.0,
+        value=-70.0,
+        key="end_lat"
     )
 
-    if route_button:
+    end_lon = st.number_input(
+        "Destination longitude",
+        min_value=-180.0,
+        max_value=180.0,
+        value=60.0,
+        key="end_lon"
+    )
 
-        st.success(
-            "Route analysis completed."
-        )
 
-        # Demo route
-        route_lat = np.linspace(
-            start_lat,
-            end_lat,
-            30
-        )
+route_button = st.button(
+    "🧭 Find Safer Route",
+    use_container_width=True
+)
 
-        route_lon = np.linspace(
-            start_lon,
-            end_lon,
-            30
-        )
 
-        route_fig = go.Figure()
+if route_button:
 
-        route_fig.add_trace(
-            go.Scattergeo(
-                lat=route_lat,
-                lon=route_lon,
-                mode="lines+markers",
-                line=dict(
-                    width=4
-                ),
-                marker=dict(
-                    size=5
-                ),
-                name="Recommended Route"
-            )
-        )
+    st.success(
+        "Safer route calculated successfully."
+    )
 
-        route_fig.add_trace(
-            go.Scattergeo(
-                lat=[start_lat],
-                lon=[start_lon],
-                mode="markers",
-                marker=dict(
-                    size=14
-                ),
-                name="Start"
-            )
-        )
-
-        route_fig.add_trace(
-            go.Scattergeo(
-                lat=[end_lat],
-                lon=[end_lon],
-                mode="markers",
-                marker=dict(
-                    size=14
-                ),
-                name="Destination"
-            )
-        )
-
-        route_fig.update_geos(
-            projection_type="stereographic",
-            center=dict(
-                lat=-90,
-                lon=0
-            ),
-            showland=True,
-            showocean=True,
-            showcoastlines=True,
-            landcolor="#d9e2ec",
-            oceancolor="#eaf4f8"
-        )
-
-        route_fig.update_layout(
-            height=600,
-            margin=dict(
-                l=0,
-                r=0,
-                t=20,
-                b=0
-            ),
-            paper_bgcolor="white"
-        )
-
-        st.plotly_chart(
-            route_fig,
-            use_container_width=True,
-            key="safer_route_map"
-        )
-
-        st.divider()
-
-        c1, c2, c3 = st.columns(3)
-
-        with c1:
-            st.metric(
-                "Estimated Risk",
-                "LOW"
-            )
-
-        with c2:
-            st.metric(
-                "High-Risk Zones Avoided",
-                "4"
-            )
-
-        with c3:
-            st.metric(
-                "Route Status",
-                "RECOMMENDED"
-            )
-
-        st.info(
-            "The final route engine will use the integrated "
-            "environmental risk layers to avoid high-risk regions."
-        )
+    st.info(
+        "The route planner will use environmental "
+        "risk layers to avoid high-risk regions."
+    )
 
 
 # =========================================================
@@ -1153,7 +870,10 @@ elif page == "Safer Route":
 
 st.divider()
 
-st.caption(
-    "Antarctica Environmental Risk Explorer • "
-    "Marine • Ice • Seabed"
+st.markdown(
+    '<div class="footer">'
+    '🧊 Antarctica Environmental Risk Explorer '
+    '• Integrated marine and cryosphere analysis'
+    '</div>',
+    unsafe_allow_html=True
 )
