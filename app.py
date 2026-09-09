@@ -1,941 +1,1021 @@
-import os
-import json
-import numpy as np
-import pandas as pd
 import streamlit as st
+import pandas as pd
+import numpy as np
 import plotly.graph_objects as go
-import plotly.express as px
+import xarray as xr
+import requests
+import json
+import math
+import re
+
+from pathlib import Path
+from scipy.spatial import cKDTree
+from pyproj import Transformer
 
 
 # ============================================================
-# POLAR-SAFE
-# Antarctic Environmental Risk & Navigation Dashboard
-# SIH26059
+# PAGE CONFIG
 # ============================================================
 
 st.set_page_config(
-    page_title="POLAR-SAFE | Antarctic Risk Explorer",
+    page_title="PolarSafe | Antarctica Environmental Risk",
     page_icon="🧊",
     layout="wide",
-    initial_sidebar_state="expanded",
+    initial_sidebar_state="expanded"
 )
 
 
 # ============================================================
-# THEME / CSS
+# THEME
 # ============================================================
 
+BLUE = "#0b2d4d"
+BLUE_2 = "#123f63"
+BLUE_3 = "#1c587d"
+LIGHT_BLUE = "#eaf6ff"
+ICE_BLUE = "#dff3ff"
+CYAN = "#38bdf8"
+WHITE = "#ffffff"
+TEXT = "#102a43"
+MUTED = "#486581"
+BORDER = "#c7dceb"
+
+GREEN = "#16a34a"
+YELLOW = "#f59e0b"
+RED = "#dc2626"
+
+
 st.markdown(
-    """
+    f"""
     <style>
 
-    /* ---------- GLOBAL ---------- */
-
-    .stApp {
+    .stApp {{
         background:
-            radial-gradient(
-                circle at 15% 0%,
-                rgba(41, 117, 181, 0.20),
-                transparent 35%
-            ),
-            radial-gradient(
-                circle at 90% 10%,
-                rgba(20, 93, 145, 0.18),
-                transparent 30%
-            ),
             linear-gradient(
                 135deg,
-                #eef7fc 0%,
-                #dceefa 45%,
-                #f7fbfe 100%
+                #eef8ff 0%,
+                #ffffff 45%,
+                #e7f5ff 100%
             );
+        color: {TEXT};
+    }}
 
-        color: #102a43;
-    }
-
-    .main {
-        background: transparent;
-    }
-
-    .block-container {
+    .main .block-container {{
         padding-top: 1.5rem;
-        padding-bottom: 2.5rem;
+        padding-bottom: 2rem;
         max-width: 1500px;
-    }
+    }}
 
-    /* ---------- SIDEBAR ---------- */
-
-    [data-testid="stSidebar"] {
+    section[data-testid="stSidebar"] {{
         background:
             linear-gradient(
                 180deg,
-                #08243d 0%,
-                #0b3557 48%,
-                #0e426b 100%
+                #e7f5ff 0%,
+                #d7efff 50%,
+                #c8e8fa 100%
             );
-    }
+        border-right: 1px solid {BORDER};
+    }}
 
-    [data-testid="stSidebar"] * {
-        color: #f4faff !important;
-    }
+    section[data-testid="stSidebar"] * {{
+        color: {TEXT} !important;
+    }}
 
-    [data-testid="stSidebar"] .stRadio label,
-    [data-testid="stSidebar"] .stSelectbox label,
-    [data-testid="stSidebar"] .stSlider label {
-        color: #e8f5ff !important;
-        font-weight: 600;
-    }
+    h1, h2, h3, h4 {{
+        color: {BLUE} !important;
+    }}
 
-    /* ---------- HEADINGS ---------- */
+    p, label, span, div {{
+        color: {TEXT};
+    }}
 
-    h1, h2, h3 {
-        color: #0a2c47 !important;
-    }
+    .stCaption {{
+        color: {MUTED} !important;
+    }}
 
-    p, li, label {
-        color: #183b56;
-    }
-
-    /* ---------- HERO ---------- */
-
-    .hero {
-        padding: 2rem 2.2rem;
-        border-radius: 22px;
-
-        background:
-            linear-gradient(
-                135deg,
-                #082b49 0%,
-                #0c466f 50%,
-                #12658e 100%
-            );
-
-        border: 1px solid rgba(255,255,255,0.18);
-        box-shadow: 0 14px 40px rgba(8,43,73,0.18);
-
-        margin-bottom: 1.2rem;
-    }
-
-    .hero-title {
-        color: #ffffff !important;
-        font-size: 2.7rem;
-        font-weight: 800;
-        letter-spacing: 0.5px;
-        margin-bottom: 0.35rem;
-    }
-
-    .hero-subtitle {
-        color: #d9f1ff !important;
-        font-size: 1.05rem;
-        margin-top: 0.15rem;
-    }
-
-    .hero-tag {
-        display: inline-block;
-        margin-top: 1rem;
-        padding: 0.35rem 0.8rem;
-        border-radius: 999px;
-        background: rgba(255,255,255,0.12);
-        color: #ffffff !important;
-        font-size: 0.85rem;
-        border: 1px solid rgba(255,255,255,0.15);
-    }
-
-    /* ---------- SECTION ---------- */
-
-    .section-title {
-        color: #083452 !important;
-        font-size: 1.45rem;
-        font-weight: 800;
-        margin-top: 1rem;
-        margin-bottom: 0.4rem;
-    }
-
-    .section-subtitle {
-        color: #46647a !important;
-        margin-bottom: 1rem;
-    }
-
-    /* ---------- CARDS ---------- */
-
-    .info-card {
-        background: rgba(255,255,255,0.88);
-        border: 1px solid #c9e1ef;
-        border-radius: 16px;
-        padding: 1.2rem;
-        box-shadow: 0 6px 22px rgba(14,66,107,0.08);
-        min-height: 125px;
-    }
-
-    .info-card h3 {
-        margin-top: 0;
-        color: #0a3b5c !important;
-        font-size: 1.05rem;
-    }
-
-    .info-card p {
-        color: #49677a !important;
-        font-size: 0.92rem;
-    }
-
-    /* ---------- RISK CARDS ---------- */
-
-    .risk-high {
-        background: linear-gradient(135deg, #fff1f1, #ffe0e0);
-        border: 1px solid #f2aaaa;
-        color: #7f1d1d !important;
-        padding: 1.2rem;
-        border-radius: 16px;
-        text-align: center;
-    }
-
-    .risk-medium {
-        background: linear-gradient(135deg, #fff9e8, #ffefbf);
-        border: 1px solid #e7cc75;
-        color: #713f12 !important;
-        padding: 1.2rem;
-        border-radius: 16px;
-        text-align: center;
-    }
-
-    .risk-low {
-        background: linear-gradient(135deg, #ecfdf5, #d3f6e5);
-        border: 1px solid #9ad8b7;
-        color: #14532d !important;
-        padding: 1.2rem;
-        border-radius: 16px;
-        text-align: center;
-    }
-
-    /* ---------- WARNING ---------- */
-
-    .warning-box {
-        padding: 0.95rem 1.2rem;
+    div[data-testid="stMetric"] {{
+        background: rgba(255,255,255,0.85);
+        border: 1px solid {BORDER};
         border-radius: 14px;
-        background: #e5f4fc;
-        border: 1px solid #a9d5eb;
-        color: #12415e !important;
-        margin-bottom: 1rem;
-    }
+        padding: 14px;
+        box-shadow: 0 4px 15px rgba(18,63,99,0.06);
+    }}
 
-    /* ---------- ROUTE ---------- */
+    div[data-testid="stMetricLabel"] {{
+        color: {MUTED} !important;
+    }}
 
-    .route-card {
-        padding: 1.3rem;
-        border-radius: 16px;
-        border: 1px solid #b9d8e9;
-        background:
-            linear-gradient(
-                135deg,
-                #ffffff,
-                #eaf6fc
-            );
-        margin-bottom: 0.8rem;
-        box-shadow: 0 6px 20px rgba(8,43,73,0.07);
-    }
-
-    .route-card h3 {
-        color: #0b4265 !important;
-        margin-top: 0;
-    }
-
-    .route-card p {
-        color: #426174 !important;
-    }
-
-    /* ---------- BUTTONS ---------- */
-
-    .stButton > button {
-        border-radius: 10px;
-        border: 1px solid #8bbdd6;
-        background: linear-gradient(
-            135deg,
-            #0b4f78,
-            #0d6b96
-        );
-        color: white !important;
+    div[data-testid="stMetricValue"] {{
+        color: {BLUE} !important;
         font-weight: 700;
-        min-height: 2.6rem;
-    }
+    }}
 
-    .stButton > button:hover {
-        background: linear-gradient(
-            135deg,
-            #083d60,
-            #095a82
-        );
-        color: white !important;
-        border-color: #6ca9c7;
-    }
+    .card {{
+        background: rgba(255,255,255,0.90);
+        border: 1px solid {BORDER};
+        border-radius: 16px;
+        padding: 18px;
+        box-shadow: 0 5px 20px rgba(18,63,99,0.07);
+        margin-bottom: 15px;
+    }}
 
-    /* ---------- DATAFRAME ---------- */
+    .section-title {{
+        color: {BLUE};
+        font-size: 17px;
+        font-weight: 700;
+        margin-bottom: 4px;
+    }}
 
-    [data-testid="stDataFrame"] {
+    .section-subtitle {{
+        color: {MUTED};
+        font-size: 13px;
+        margin-bottom: 15px;
+    }}
+
+    .risk-high {{
+        background: #fee2e2;
+        border: 1px solid #fecaca;
+        color: #991b1b;
+        border-radius: 14px;
+        padding: 18px;
+        text-align: center;
+    }}
+
+    .risk-medium {{
+        background: #fef3c7;
+        border: 1px solid #fde68a;
+        color: #92400e;
+        border-radius: 14px;
+        padding: 18px;
+        text-align: center;
+    }}
+
+    .risk-low {{
+        background: #dcfce7;
+        border: 1px solid #bbf7d0;
+        color: #166534;
+        border-radius: 14px;
+        padding: 18px;
+        text-align: center;
+    }}
+
+    .data-status {{
+        background: #f0f9ff;
+        border: 1px solid #bae6fd;
         border-radius: 12px;
-        overflow: hidden;
-    }
+        padding: 12px;
+        margin-bottom: 8px;
+    }}
 
-    /* ---------- METRICS ---------- */
-
-    [data-testid="stMetric"] {
-        background: rgba(255,255,255,0.88);
-        border: 1px solid #c7dfed;
-        padding: 0.9rem;
-        border-radius: 14px;
-        box-shadow: 0 5px 18px rgba(8,43,73,0.06);
-    }
-
-    [data-testid="stMetricLabel"] {
-        color: #426276 !important;
-    }
-
-    [data-testid="stMetricValue"] {
-        color: #073a5a !important;
-    }
-
-    /* ---------- TABS ---------- */
-
-    button[data-baseweb="tab"] {
-        color: #244c65 !important;
+    .stButton > button {{
+        background: linear-gradient(
+            90deg,
+            #0b2d4d,
+            #17618c
+        );
+        color: white !important;
+        border: none;
+        border-radius: 10px;
         font-weight: 700;
-    }
+    }}
 
-    button[data-baseweb="tab"][aria-selected="true"] {
-        color: #075985 !important;
-    }
+    .stButton > button:hover {{
+        background: linear-gradient(
+            90deg,
+            #17618c,
+            #38bdf8
+        );
+        color: white !important;
+    }}
 
-    /* ---------- FOOTER ---------- */
-
-    .footer {
-        text-align: center;
-        color: #557286 !important;
-        padding: 1.2rem;
-        font-size: 0.85rem;
-    }
+    hr {{
+        border-color: {BORDER};
+    }}
 
     </style>
     """,
-    unsafe_allow_html=True,
+    unsafe_allow_html=True
 )
 
 
 # ============================================================
-# FILE PATHS
+# CONSTANTS
 # ============================================================
 
-BASE_DIR = os.path.dirname(os.path.abspath(__file__))
+BASE_DIR = Path(__file__).resolve().parent
 
-PATHS = {
-    "sea_ice": os.path.join(
-        BASE_DIR,
-        "antarctic_sea_ice_risk_2025-04-16.csv"
-    ),
+BED_MACHINE_NAME = (
+    "NSIDC-0756_BedMachineAntarctica_"
+    "19700101-20191001_V04.1.nc"
+)
 
-    "iceberg_risk": os.path.join(
-        BASE_DIR,
-        "iceberg_risk_layer.csv"
-    ),
+SEA_ICE_NAME = "G10010_sibt1850_v2.0.nc"
 
-    "iceberg_trajectory": os.path.join(
-        BASE_DIR,
-        "iceberg_trajectory_predictions.csv"
-    ),
+ICEBERG_URL = (
+    "https://raw.githubusercontent.com/"
+    "Joel-hanson/Iceberg-locations/main/api/latest.json"
+)
 
-    "combined": os.path.join(
-        BASE_DIR,
-        "antarctic_combined_navigation_risk_2025-04-16.csv"
-    ),
+CURRENT_BASE_URL = (
+    "https://coastwatch.pfeg.noaa.gov/erddap/griddap/"
+    "noaacwBLENDEDNRTcurrentsDaily.csv"
+)
 
-    "shortest": os.path.join(
-        BASE_DIR,
-        "shortest_route.csv"
-    ),
+SEA_ICE_FALLBACK_URL = (
+    "https://ftp.cpc.ncep.noaa.gov/hwang/sea_ice/"
+    "G10010_sibt1850_v2.0.nc"
+)
 
-    "balanced": os.path.join(
-        BASE_DIR,
-        "balanced_route.csv"
-    ),
-
-    "risk_aware": os.path.join(
-        BASE_DIR,
-        "risk_aware_route.csv"
-    ),
-
-    "comparison": os.path.join(
-        BASE_DIR,
-        "route_comparison.csv"
-    ),
-
-    "dashboard": os.path.join(
-        BASE_DIR,
-        "dashboard_data.json"
-    ),
+# Real Antarctic locations
+ANTARCTIC_LOCATIONS = {
+    "Rothera Research Station": (-67.568, -68.129),
+    "Vernadsky Research Base": (-65.246, -64.257),
+    "McMurdo Station": (-77.846, 166.668),
+    "Casey Research Station": (-66.282, 110.524),
+    "Dumont d'Urville Station": (-66.663, 140.002),
+    "Neumayer Station III": (-70.650, -8.250),
+    "Halley VI Research Station": (-75.582, -26.655),
 }
 
 
 # ============================================================
-# DATA LOADING
+# FILE FINDER
 # ============================================================
 
-@st.cache_data
-def load_csv(path):
+def find_local_file(filename):
 
-    if not os.path.exists(path):
-        return pd.DataFrame()
-
-    try:
-        return pd.read_csv(path)
-    except Exception as exc:
-        st.error(
-            f"Could not read {os.path.basename(path)}: {exc}"
-        )
-        return pd.DataFrame()
-
-
-@st.cache_data
-def load_json(path):
-
-    if not os.path.exists(path):
-        return {}
-
-    try:
-        with open(path, "r", encoding="utf-8") as f:
-            return json.load(f)
-
-    except Exception:
-        return {}
-
-
-sea_ice = load_csv(PATHS["sea_ice"])
-iceberg_risk = load_csv(PATHS["iceberg_risk"])
-iceberg_trajectory = load_csv(PATHS["iceberg_trajectory"])
-combined = load_csv(PATHS["combined"])
-
-shortest_route = load_csv(PATHS["shortest"])
-balanced_route = load_csv(PATHS["balanced"])
-risk_aware_route = load_csv(PATHS["risk_aware"])
-route_comparison = load_csv(PATHS["comparison"])
-
-dashboard_data = load_json(PATHS["dashboard"])
-
-
-# ============================================================
-# CLEAN COORDINATES
-# ============================================================
-
-def clean_coordinates(df):
-
-    if df.empty:
-        return df
-
-    out = df.copy()
-
-    for col in ("latitude", "longitude"):
-
-        if col in out.columns:
-            out[col] = pd.to_numeric(
-                out[col],
-                errors="coerce"
-            )
-
-    if "longitude" in out.columns:
-
-        out["longitude"] = (
-            (out["longitude"] + 180) % 360
-        ) - 180
-
-    keep = [
-        c for c in
-        ("latitude", "longitude")
-        if c in out.columns
+    candidates = [
+        BASE_DIR / filename,
+        BASE_DIR / "data" / filename,
+        BASE_DIR / "data" / "raw" / filename,
+        BASE_DIR / "data" / "raw" / "sea_ice" / filename,
+        BASE_DIR / "data" / "raw" / "bedmachine" / filename,
+        BASE_DIR / "bedmachine_data" / filename,
+        Path("/content") / filename,
+        Path("/content/bedmachine_data") / filename,
+        Path("/content/data/raw/sea_ice") / filename,
     ]
 
-    if keep:
-        out = out.dropna(subset=keep)
+    for path in candidates:
+        if path.exists():
+            return path
 
-    return out
+    # Recursive search inside repository
+    try:
+        matches = list(BASE_DIR.rglob(filename))
+        if matches:
+            return matches[0]
+    except Exception:
+        pass
 
+    # Colab search
+    try:
+        content = Path("/content")
 
-sea_ice = clean_coordinates(sea_ice)
-iceberg_risk = clean_coordinates(iceberg_risk)
-iceberg_trajectory = clean_coordinates(iceberg_trajectory)
-combined = clean_coordinates(combined)
+        if content.exists():
+            matches = list(content.rglob(filename))
 
-shortest_route = clean_coordinates(shortest_route)
-balanced_route = clean_coordinates(balanced_route)
-risk_aware_route = clean_coordinates(risk_aware_route)
+            if matches:
+                return matches[0]
 
-
-# ============================================================
-# HELPERS
-# ============================================================
-
-def first_existing_column(df, names):
-
-    for name in names:
-
-        if name in df.columns:
-            return name
+    except Exception:
+        pass
 
     return None
 
 
-def risk_column(df):
-
-    return first_existing_column(
-        df,
-        [
-            "combined_risk_score",
-            "sea_ice_risk_score",
-            "iceberg_risk_score",
-            "risk_score",
-        ],
-    )
-
-
-def route_distance(df):
-
-    col = first_existing_column(
-        df,
-        [
-            "distance_km",
-            "route_distance_km",
-            "cumulative_distance_km",
-            "total_distance_km",
-        ],
-    )
-
-    if col is None or df.empty:
-        return np.nan
-
-    values = pd.to_numeric(
-        df[col],
-        errors="coerce"
-    ).dropna()
-
-    return (
-        float(values.max())
-        if not values.empty
-        else np.nan
-    )
-
-
-def sample_map_data(df, max_points=25000):
-
-    """
-    Large CSV layers can contain hundreds of thousands
-    of points. Rendering all of them causes browser
-    lag/blinking.
-
-    We therefore display a representative subset.
-    The original CSV remains untouched.
-    """
-
-    if len(df) <= max_points:
-        return df
-
-    return df.sample(
-        n=max_points,
-        random_state=42
-    )
-
-
 # ============================================================
-# POLAR MAP SETTINGS
+# BEDMACHINE LOADER
 # ============================================================
 
-def polar_geo_settings():
+@st.cache_data(show_spinner=False)
+def load_bedmachine():
 
-    return dict(
+    path = find_local_file(BED_MACHINE_NAME)
 
-        projection=dict(
-            type="stereographic"
-        ),
+    if path is None:
 
-        center=dict(
-            lat=-90,
-            lon=0
-        ),
-
-        projection_rotation=dict(
-            lon=0,
-            lat=-90,
-            roll=0
-        ),
-
-        showland=True,
-        landcolor="#d9eaf3",
-
-        showocean=True,
-        oceancolor="#d7edf8",
-
-        showcountries=True,
-        countrycolor="#8aaabd",
-
-        showcoastlines=True,
-        coastlinecolor="#31566b",
-        coastlinewidth=0.8,
-
-        showframe=False,
-
-        lataxis=dict(
-            showgrid=True,
-            gridcolor="#b5cfdd",
-            gridwidth=0.5
-        ),
-
-        lonaxis=dict(
-            showgrid=True,
-            gridcolor="#b5cfdd",
-            gridwidth=0.5
-        ),
-
-        bgcolor="#e8f5fb",
-    )
-
-
-# ============================================================
-# MAP CREATOR
-# ============================================================
-
-def create_risk_map(
-    df,
-    risk_col,
-    title,
-    marker_size=6,
-    colorscale="Turbo",
-):
-
-    fig = go.Figure()
-
-    if df.empty:
-
-        fig.add_annotation(
-            text="No data available for this layer.",
-            x=0.5,
-            y=0.5,
-            xref="paper",
-            yref="paper",
-            showarrow=False,
-            font=dict(
-                size=18,
-                color="#173b56"
+        return {
+            "available": False,
+            "message": (
+                "BedMachine file was not found in the Streamlit repository. "
+                "The dashboard will still run, but bathymetry-based risk "
+                "will be unavailable."
             )
+        }
+
+    try:
+
+        ds = xr.open_dataset(path)
+
+        x = ds["x"].values
+        y = ds["y"].values
+
+        # Downsample the 500 m BedMachine grid.
+        # We do NOT load the entire 13,333 x 13,333 grid.
+        target = 180
+
+        step_x = max(1, len(x) // target)
+        step_y = max(1, len(y) // target)
+
+        x_small = x[::step_x]
+        y_small = y[::step_y]
+
+        bed = ds["bed"].isel(
+            x=slice(None, None, step_x),
+            y=slice(None, None, step_y)
+        ).values.astype(float)
+
+        mask = ds["mask"].isel(
+            x=slice(None, None, step_x),
+            y=slice(None, None, step_y)
+        ).values.astype(np.int8)
+
+        errbed = ds["errbed"].isel(
+            x=slice(None, None, step_x),
+            y=slice(None, None, step_y)
+        ).values.astype(float)
+
+        ds.close()
+
+        xx, yy = np.meshgrid(x_small, y_small)
+
+        transformer = Transformer.from_crs(
+            "EPSG:3031",
+            "EPSG:4326",
+            always_xy=True
         )
 
-    else:
+        lon, lat = transformer.transform(xx, yy)
 
-        plot_df = sample_map_data(
-            df,
-            max_points=25000
+        # Antarctica BedMachine mask:
+        # 0 = ocean
+        # 1 = ice-free land
+        # 2 = grounded ice
+        # 3 = floating ice
+        # 4 = Lake Vostok
+
+        ocean = (
+            (mask == 0)
+            & np.isfinite(bed)
+            & (bed < 50)
         )
 
-        if risk_col and risk_col in plot_df.columns:
+        # Calculate seabed slope
+        dx = abs(float(np.nanmedian(np.diff(x_small))))
+        dy = abs(float(np.nanmedian(np.diff(y_small))))
 
-            values = pd.to_numeric(
-                plot_df[risk_col],
-                errors="coerce"
-            ).fillna(0)
+        bed_clean = np.where(np.isfinite(bed), bed, np.nan)
 
-            fig.add_trace(
-                go.Scattergeo(
+        gy, gx = np.gradient(
+            bed_clean,
+            dy,
+            dx
+        )
 
-                    lon=plot_df["longitude"],
-                    lat=plot_df["latitude"],
+        slope = np.sqrt(
+            np.nan_to_num(gx) ** 2
+            +
+            np.nan_to_num(gy) ** 2
+        )
 
-                    mode="markers",
+        slope = np.clip(slope, 0, 1)
 
-                    marker=dict(
-                        size=marker_size,
-                        color=values,
-                        colorscale=colorscale,
-                        cmin=0,
-                        cmax=100,
-                        opacity=0.72,
-                        line=dict(
-                            width=0
-                        ),
+        return {
+            "available": True,
+            "path": str(path),
+            "x": x_small,
+            "y": y_small,
+            "lon": lon,
+            "lat": lat,
+            "bed": bed,
+            "mask": mask,
+            "errbed": errbed,
+            "slope": slope,
+            "ocean": ocean
+        }
 
-                        colorbar=dict(
-                            title=dict(
-                                text="Risk<br>0–100",
-                                font=dict(
-                                    color="#173b56"
-                                )
-                            ),
-                            tickfont=dict(
-                                color="#173b56"
-                            )
-                        )
-                    ),
+    except Exception as e:
 
-                    customdata=np.column_stack(
-                        [
-                            plot_df["latitude"],
-                            plot_df["longitude"],
-                            values
-                        ]
-                    ),
+        return {
+            "available": False,
+            "message": f"BedMachine could not be opened: {e}"
+        }
 
-                    hovertemplate=(
-                        "<b>Environmental Risk</b><br>"
-                        "Latitude: %{customdata[0]:.2f}°<br>"
-                        "Longitude: %{customdata[1]:.2f}°<br>"
-                        "Risk: %{customdata[2]:.1f}/100"
-                        "<extra></extra>"
-                    ),
 
-                    name="Risk"
+# ============================================================
+# SEA ICE LOADER
+# ============================================================
+
+@st.cache_data(ttl=3600, show_spinner=False)
+def load_sea_ice():
+
+    # First look for user's processed CSV
+    processed = BASE_DIR / "data" / "processed" / "sea_ice"
+
+    if processed.exists():
+
+        csv_files = list(
+            processed.glob("*.csv")
+        )
+
+        if csv_files:
+
+            try:
+
+                df = pd.read_csv(csv_files[0])
+
+                possible_ice = [
+                    "sea_ice_concentration",
+                    "seaice_conc",
+                    "F17_ICECON"
+                ]
+
+                ice_col = None
+
+                for c in possible_ice:
+                    if c in df.columns:
+                        ice_col = c
+                        break
+
+                if ice_col is not None:
+
+                    lat_col = (
+                        "latitude"
+                        if "latitude" in df.columns
+                        else "lat"
+                    )
+
+                    lon_col = (
+                        "longitude"
+                        if "longitude" in df.columns
+                        else "lon"
+                    )
+
+                    out = df[
+                        [lat_col, lon_col, ice_col]
+                    ].copy()
+
+                    out.columns = [
+                        "latitude",
+                        "longitude",
+                        "ice"
+                    ]
+
+                    out["ice"] = pd.to_numeric(
+                        out["ice"],
+                        errors="coerce"
+                    )
+
+                    # Convert 0-1 to percentage
+                    if out["ice"].max() <= 1.5:
+                        out["ice"] *= 100
+
+                    out = out[
+                        out["latitude"] <= -50
+                    ]
+
+                    out = out.dropna()
+
+                    return {
+                        "available": True,
+                        "data": out,
+                        "date": "Local processed dataset"
+                    }
+
+            except Exception:
+                pass
+
+    # Try raw G10010
+    path = find_local_file(SEA_ICE_NAME)
+
+    if path is None:
+
+        # Download public NOAA copy automatically
+        try:
+
+            response = requests.get(
+                SEA_ICE_FALLBACK_URL,
+                timeout=60
+            )
+
+            response.raise_for_status()
+
+            temp_path = (
+                Path("/tmp") /
+                "G10010_sibt1850_v2.0.nc"
+            )
+
+            with open(temp_path, "wb") as f:
+                f.write(response.content)
+
+            path = temp_path
+
+        except Exception as e:
+
+            return {
+                "available": False,
+                "message": f"Sea-ice data unavailable: {e}"
+            }
+
+    try:
+
+        ds = xr.open_dataset(path)
+
+        if "seaice_conc" in ds:
+
+            variable = ds["seaice_conc"]
+
+            # Latest available observation
+            variable = variable.isel(time=-1)
+
+            lat_name = "latitude"
+            lon_name = "longitude"
+
+            source_lat = ds[lat_name].values
+            source_lon = ds[lon_name].values
+
+            values = variable.values.astype(float)
+
+            # Convert packed values if necessary
+            if np.nanmax(values) > 100:
+                values = values / 250.0 * 100
+
+            elif np.nanmax(values) <= 1.5:
+                values *= 100
+
+            lat_grid, lon_grid = np.meshgrid(
+                source_lat,
+                source_lon,
+                indexing="ij"
+            )
+
+            df = pd.DataFrame({
+                "latitude": lat_grid.ravel(),
+                "longitude": lon_grid.ravel(),
+                "ice": values.ravel()
+            })
+
+            df = df[
+                df["latitude"] <= -50
+            ]
+
+            df = df[
+                (df["ice"] >= 0)
+                &
+                (df["ice"] <= 100)
+            ]
+
+            df = df.dropna()
+
+            # Limit display size
+            if len(df) > 8000:
+                df = df.sample(
+                    8000,
+                    random_state=42
                 )
+
+            date = str(
+                ds["time"].values[-1]
             )
+
+            ds.close()
+
+            return {
+                "available": True,
+                "data": df,
+                "date": date
+            }
+
+        # Support processed NSIDC polar stereographic file
+        if "F17_ICECON" in ds:
+
+            variable = ds["F17_ICECON"]
+
+            if "time" in variable.dims:
+                variable = variable.isel(time=0)
+
+            arr = variable.values.astype(float)
+
+            if np.nanmax(arr) <= 1.5:
+                arr *= 100
+
+            x = ds["x"].values
+            y = ds["y"].values
+
+            xx, yy = np.meshgrid(x, y)
+
+            transformer = Transformer.from_crs(
+                "EPSG:3412",
+                "EPSG:4326",
+                always_xy=True
+            )
+
+            lon, lat = transformer.transform(
+                xx,
+                yy
+            )
+
+            df = pd.DataFrame({
+                "latitude": lat.ravel(),
+                "longitude": lon.ravel(),
+                "ice": arr.ravel()
+            })
+
+            df = df[
+                (df["latitude"] <= -50)
+                &
+                (df["ice"] >= 0)
+                &
+                (df["ice"] <= 100)
+            ]
+
+            df = df.dropna()
+
+            if len(df) > 8000:
+                df = df.sample(
+                    8000,
+                    random_state=42
+                )
+
+            ds.close()
+
+            return {
+                "available": True,
+                "data": df,
+                "date": "NSIDC Antarctic sea-ice grid"
+            }
+
+        ds.close()
+
+        return {
+            "available": False,
+            "message": "Recognized NetCDF file but no sea-ice variable was found."
+        }
+
+    except Exception as e:
+
+        return {
+            "available": False,
+            "message": f"Sea-ice file could not be read: {e}"
+        }
+
+
+# ============================================================
+# ICEBERG LOADER
+# ============================================================
+
+@st.cache_data(ttl=1800, show_spinner=False)
+def load_icebergs():
+
+    try:
+
+        response = requests.get(
+            ICEBERG_URL,
+            timeout=30
+        )
+
+        response.raise_for_status()
+
+        raw = response.json()
+
+        rows = []
+
+        # Most versions of the data are date -> records
+        if isinstance(raw, dict):
+
+            if all(
+                isinstance(v, list)
+                for v in raw.values()
+            ):
+
+                latest_key = sorted(
+                    raw.keys()
+                )[-1]
+
+                records = raw[latest_key]
+
+            else:
+
+                records = raw
+
+        elif isinstance(raw, list):
+
+            records = raw
 
         else:
 
-            fig.add_trace(
-                go.Scattergeo(
+            records = []
 
-                    lon=plot_df["longitude"],
-                    lat=plot_df["latitude"],
+        for item in records:
 
-                    mode="markers",
+            if not isinstance(item, dict):
+                continue
 
-                    marker=dict(
-                        size=marker_size,
-                        opacity=0.65
-                    ),
+            name = (
+                item.get("iceberg")
+                or item.get("name")
+                or item.get("id")
+                or "Unknown"
+            )
 
-                    hovertemplate=(
-                        "Latitude: %{lat:.2f}°<br>"
-                        "Longitude: %{lon:.2f}°"
-                        "<extra></extra>"
-                    ),
+            lat = item.get("latitude")
+            lon = item.get("longitude")
 
-                    name="Observations"
+            try:
+
+                lat = float(lat)
+                lon = float(lon)
+
+            except Exception:
+
+                continue
+
+            if lat > -45:
+                continue
+
+            rows.append({
+                "iceberg": str(name).upper(),
+                "latitude": lat,
+                "longitude": lon,
+                "observation": item.get(
+                    "recent_observation",
+                    ""
                 )
-            )
+            })
 
-    fig.update_geos(
-        **polar_geo_settings()
-    )
+        df = pd.DataFrame(rows)
 
-    fig.update_layout(
+        if len(df) == 0:
 
-        title=dict(
-            text=title,
-            font=dict(
-                size=20,
-                color="#0a3552"
-            ),
-            x=0.02
-        ),
+            return {
+                "available": False,
+                "message": "No current iceberg records returned."
+            }
 
-        height=620,
+        return {
+            "available": True,
+            "data": df
+        }
 
-        margin=dict(
-            l=0,
-            r=0,
-            t=60,
-            b=0
-        ),
+    except Exception as e:
 
-        paper_bgcolor="#e8f5fb",
-        plot_bgcolor="#e8f5fb",
-
-        font=dict(
-            color="#173b56"
-        ),
-
-        legend=dict(
-            bgcolor="rgba(255,255,255,0.75)",
-            font=dict(
-                color="#173b56"
-            )
-        ),
-
-        uirevision="polar-safe-map"
-    )
-
-    return fig
+        return {
+            "available": False,
+            "message": f"Iceberg service unavailable: {e}"
+        }
 
 
 # ============================================================
-# ROUTE MAP
+# OCEAN CURRENT LOADER
 # ============================================================
 
-def add_route_trace(
-    fig,
-    df,
-    name,
-    width
-):
+@st.cache_data(ttl=1800, show_spinner=False)
+def load_currents():
 
-    if df.empty:
-        return
+    try:
 
-    if not {
-        "latitude",
-        "longitude"
-    }.issubset(df.columns):
-
-        return
-
-    plot_df = sample_map_data(
-        df,
-        max_points=5000
-    )
-
-    fig.add_trace(
-        go.Scattergeo(
-
-            lon=plot_df["longitude"],
-            lat=plot_df["latitude"],
-
-            mode="lines",
-
-            line=dict(
-                width=width
-            ),
-
-            name=name,
-
-            hovertemplate=(
-                "Latitude: %{lat:.2f}°<br>"
-                "Longitude: %{lon:.2f}°"
-                f"<extra>{name}</extra>"
-            )
+        query = (
+            "u_current[(last)][(-80):4:(-55)]"
+            "[(-180):8:(180)],"
+            "v_current[(last)][(-80):4:(-55)]"
+            "[(-180):8:(180)]"
         )
-    )
 
+        response = requests.get(
+            CURRENT_BASE_URL,
+            params={"query": query},
+            timeout=60
+        )
 
-def create_route_map():
+        response.raise_for_status()
 
-    fig = go.Figure()
+        from io import StringIO
 
-    add_route_trace(
-        fig,
-        shortest_route,
-        "Shortest Route",
-        3
-    )
+        df = pd.read_csv(
+            StringIO(response.text),
+            skiprows=[1]
+        )
 
-    add_route_trace(
-        fig,
-        balanced_route,
-        "Balanced Route",
-        4
-    )
+        required = {
+            "latitude",
+            "longitude",
+            "u_current",
+            "v_current"
+        }
 
-    add_route_trace(
-        fig,
-        risk_aware_route,
-        "Risk-Aware Route",
-        5
-    )
+        if not required.issubset(df.columns):
 
-    # Bharati Station
-
-    fig.add_trace(
-        go.Scattergeo(
-
-            lon=[76.19525],
-            lat=[-69.4068],
-
-            mode="markers+text",
-
-            marker=dict(
-                size=13,
-                symbol="star",
-                line=dict(
-                    width=1
+            return {
+                "available": False,
+                "message": (
+                    "NOAA current response did not "
+                    "contain the expected variables."
                 )
-            ),
+            }
 
-            text=["Bharati"],
-            textposition="top center",
-
-            name="Origin",
-
-            hovertemplate=(
-                "<b>Bharati Station</b><br>"
-                "Latitude: -69.4068°<br>"
-                "Longitude: 76.1953°"
-                "<extra></extra>"
-            )
+        df["u_current"] = pd.to_numeric(
+            df["u_current"],
+            errors="coerce"
         )
-    )
 
-    # Maitri Station
-
-    fig.add_trace(
-        go.Scattergeo(
-
-            lon=[11.73333],
-            lat=[-70.76444],
-
-            mode="markers+text",
-
-            marker=dict(
-                size=13,
-                symbol="diamond",
-                line=dict(
-                    width=1
-                )
-            ),
-
-            text=["Maitri"],
-            textposition="top center",
-
-            name="Destination",
-
-            hovertemplate=(
-                "<b>Maitri Station</b><br>"
-                "Latitude: -70.7644°<br>"
-                "Longitude: 11.7333°"
-                "<extra></extra>"
-            )
+        df["v_current"] = pd.to_numeric(
+            df["v_current"],
+            errors="coerce"
         )
+
+        df["speed"] = np.sqrt(
+            df["u_current"] ** 2
+            +
+            df["v_current"] ** 2
+        )
+
+        df = df[
+            df["latitude"] <= -50
+        ]
+
+        df = df.dropna()
+
+        return {
+            "available": True,
+            "data": df
+        }
+
+    except Exception as e:
+
+        return {
+            "available": False,
+            "message": f"NOAA current data unavailable: {e}"
+        }
+
+
+# ============================================================
+# LOAD ALL DATA
+# ============================================================
+
+with st.spinner("Loading Antarctic datasets..."):
+
+    bed_data = load_bedmachine()
+    sea_data = load_sea_ice()
+    iceberg_data = load_icebergs()
+    current_data = load_currents()
+
+
+# ============================================================
+# DATA STATUS
+# ============================================================
+
+dataset_status = {
+    "BedMachine": bed_data["available"],
+    "Sea Ice": sea_data["available"],
+    "Icebergs": iceberg_data["available"],
+    "Ocean Currents": current_data["available"],
+}
+
+
+# ============================================================
+# SIDEBAR
+# ============================================================
+
+with st.sidebar:
+
+    st.markdown(
+        f"""
+        <div style="
+            font-size:24px;
+            font-weight:800;
+            color:{BLUE};
+            margin-bottom:2px;
+        ">
+        🧊 POLARSAFE
+        </div>
+
+        <div style="
+            font-size:12px;
+            color:{MUTED};
+            margin-bottom:20px;
+        ">
+        Antarctic Environmental Intelligence
+        </div>
+        """,
+        unsafe_allow_html=True
     )
 
-    fig.update_geos(
-        **polar_geo_settings()
+    st.markdown("### 🗺️ MAP LAYERS")
+
+    show_risk = st.checkbox(
+        "Environmental Risk",
+        True
     )
 
-    fig.update_layout(
-
-        title=dict(
-            text="Bharati → Maitri Route Comparison",
-            font=dict(
-                size=20,
-                color="#0a3552"
-            )
-        ),
-
-        height=650,
-
-        margin=dict(
-            l=0,
-            r=0,
-            t=60,
-            b=0
-        ),
-
-        paper_bgcolor="#e8f5fb",
-
-        font=dict(
-            color="#173b56"
-        ),
-
-        legend=dict(
-            bgcolor="rgba(255,255,255,0.78)",
-            font=dict(
-                color="#173b56"
-            )
-        ),
-
-        uirevision="polar-safe-route"
+    show_bathymetry = st.checkbox(
+        "Bathymetry",
+        False
     )
 
-    return fig
+    show_sea_ice = st.checkbox(
+        "Sea Ice Concentration",
+        False
+    )
+
+    show_currents = st.checkbox(
+        "Ocean Currents",
+        False
+    )
+
+    show_icebergs = st.checkbox(
+        "Icebergs",
+        True
+    )
+
+    st.divider()
+
+    st.markdown("### ⚓ VESSEL")
+
+    vessel = st.selectbox(
+        "Vessel profile",
+        [
+            "Scientific Research Vessel",
+            "Standard Cargo Vessel",
+            "Polar Class Vessel"
+        ]
+    )
+
+    vessel_settings = {
+
+        "Scientific Research Vessel": {
+            "ice_limit": 55,
+            "draft": 6.4
+        },
+
+        "Standard Cargo Vessel": {
+            "ice_limit": 15,
+            "draft": 12.8
+        },
+
+        "Polar Class Vessel": {
+            "ice_limit": 90,
+            "draft": 9.5
+        }
+    }
+
+    profile = vessel_settings[vessel]
+
+    st.caption(
+        f"Maximum preferred ice: "
+        f"{profile['ice_limit']}%"
+    )
+
+    st.caption(
+        f"Typical draft: "
+        f"{profile['draft']} m"
+    )
+
+    st.divider()
+
+    st.markdown("### ⚙️ RISK WEIGHTS")
+
+    ice_weight = st.slider(
+        "Sea ice weight",
+        0,
+        100,
+        35
+    )
+
+    current_weight = st.slider(
+        "Current weight",
+        0,
+        100,
+        20
+    )
+
+    bathy_weight = st.slider(
+        "Bathymetry weight",
+        0,
+        100,
+        30
+    )
+
+    iceberg_weight = st.slider(
+        "Iceberg weight",
+        0,
+        100,
+        15
+    )
+
+    total_weight = (
+        ice_weight
+        + current_weight
+        + bathy_weight
+        + iceberg_weight
+    )
+
+    if total_weight == 0:
+        total_weight = 1
+
+    st.caption(
+        f"Total weighting: {total_weight}"
+    )
 
 
 # ============================================================
@@ -943,23 +1023,35 @@ def create_route_map():
 # ============================================================
 
 st.markdown(
-    """
-    <div class="hero">
+    f"""
+    <div class="card"
+         style="
+         background:
+         linear-gradient(
+             120deg,
+             #0b2d4d,
+             #14557c,
+             #1e6f96
+         );
+         color:white;
+         border:none;
+         padding:26px;
+         ">
 
-        <div class="hero-title">
-            🧊 POLAR-SAFE
+        <div style="
+            font-size:30px;
+            font-weight:800;
+            color:white;
+        ">
+            🧊 Antarctica Environmental Risk Explorer
         </div>
 
-        <div class="hero-subtitle">
-            Antarctic Environmental Risk & Navigation Intelligence
-        </div>
-
-        <div class="hero-subtitle">
-            Understand the ice • Track hazards • Choose safer routes
-        </div>
-
-        <div class="hero-tag">
-            SIH26059 • Decision Support Prototype
+        <div style="
+            font-size:14px;
+            color:#dff3ff;
+            margin-top:7px;
+        ">
+            Bathymetry • Sea Ice • Ocean Currents • Iceberg Monitoring
         </div>
 
     </div>
@@ -968,1496 +1060,2147 @@ st.markdown(
 )
 
 
-st.markdown(
-    """
-    <div class="warning-box">
-        <b>⚠️ Decision-support prototype:</b>
-        POLAR-SAFE combines environmental datasets to help identify
-        potentially hazardous Antarctic marine conditions.
-        It is intended to support — not replace — qualified navigation decisions.
-    </div>
-    """,
-    unsafe_allow_html=True
-)
-
-
 # ============================================================
-# SIDEBAR
+# DATA STATUS ROW
 # ============================================================
 
-st.sidebar.title("🧭 POLAR-SAFE")
+st.markdown("### 📡 Data Status")
 
-st.sidebar.caption(
-    "Antarctic navigation risk explorer"
-)
+status_cols = st.columns(4)
 
-st.sidebar.markdown("---")
+for col, (name, available) in zip(
+    status_cols,
+    dataset_status.items()
+):
 
-layer = st.sidebar.radio(
-    "Explore",
-    [
-        "Overview",
-        "Combined Risk",
-        "Sea-Ice",
-        "Icebergs",
-        "Routes",
-    ]
-)
+    with col:
 
-st.sidebar.markdown("---")
+        if available:
 
-st.sidebar.subheader("Route Scenario")
-
-origin = st.sidebar.selectbox(
-    "Origin",
-    [
-        "Bharati Station"
-    ]
-)
-
-destination = st.sidebar.selectbox(
-    "Destination",
-    [
-        "Maitri Station"
-    ]
-)
-
-safety_preference = st.sidebar.slider(
-    "Safety Preference",
-    0,
-    100,
-    80,
-    help=(
-        "Higher values place greater emphasis "
-        "on avoiding environmental risk."
-    )
-)
-
-st.sidebar.caption(
-    f"Safety Preference: {safety_preference}%"
-)
-
-st.sidebar.markdown("---")
-
-st.sidebar.caption(
-    "POLAR-SAFE • SIH26059"
-)
-
-
-# ============================================================
-# KPI CALCULATIONS
-# ============================================================
-
-combined_col = risk_column(combined)
-sea_ice_col = risk_column(sea_ice)
-iceberg_col = risk_column(iceberg_risk)
-
-
-if combined_col and not combined.empty:
-
-    combined_values = pd.to_numeric(
-        combined[combined_col],
-        errors="coerce"
-    ).dropna()
-
-    average_risk = (
-        float(combined_values.mean())
-        if not combined_values.empty
-        else 0
-    )
-
-    maximum_risk = (
-        float(combined_values.max())
-        if not combined_values.empty
-        else 0
-    )
-
-else:
-
-    average_risk = 0
-    maximum_risk = 0
-
-
-if "combined_risk_level" in combined.columns:
-
-    high_risk_cells = int(
-        combined["combined_risk_level"]
-        .astype(str)
-        .str.lower()
-        .isin(
-            [
-                "high",
-                "very high"
-            ]
-        )
-        .sum()
-    )
-
-elif combined_col:
-
-    values = pd.to_numeric(
-        combined[combined_col],
-        errors="coerce"
-    )
-
-    high_risk_cells = int(
-        (values >= 60).sum()
-    )
-
-else:
-
-    high_risk_cells = 0
-
-
-if "iceberg_id" in iceberg_risk.columns:
-
-    tracked_icebergs = int(
-        iceberg_risk["iceberg_id"]
-        .nunique()
-    )
-
-else:
-
-    tracked_icebergs = 0
-
-
-# ============================================================
-# KPI BAR
-# ============================================================
-
-k1, k2, k3, k4 = st.columns(4)
-
-k1.metric(
-    "Average Risk",
-    f"{average_risk:.1f}/100"
-)
-
-k2.metric(
-    "Maximum Risk",
-    f"{maximum_risk:.1f}/100"
-)
-
-k3.metric(
-    "Tracked Icebergs",
-    f"{tracked_icebergs:,}"
-)
-
-k4.metric(
-    "High-Risk Cells",
-    f"{high_risk_cells:,}"
-)
-
-
-st.markdown("---")
-
-
-# ============================================================
-# OVERVIEW
-# ============================================================
-
-if layer == "Overview":
-
-    st.markdown(
-        '<div class="section-title">🌊 Antarctic Environmental Overview</div>',
-        unsafe_allow_html=True
-    )
-
-    st.markdown(
-        '<div class="section-subtitle">'
-        'A single view of the environmental factors that influence '
-        'navigation risk around Antarctica.'
-        '</div>',
-        unsafe_allow_html=True
-    )
-
-    # Overview cards
-
-    c1, c2, c3 = st.columns(3)
-
-    with c1:
-
-        st.markdown(
-            """
-            <div class="info-card">
-
-            <h3>🧊 Sea-Ice Conditions</h3>
-
-            <p>
-            Monitor sea-ice concentration and the derived
-            navigation-risk surface.
-            </p>
-
-            </div>
-            """,
-            unsafe_allow_html=True
-        )
-
-    with c2:
-
-        st.markdown(
-            """
-            <div class="info-card">
-
-            <h3>🧊 Iceberg Monitoring</h3>
-
-            <p>
-            Explore observed iceberg positions,
-            predicted trajectories and risk levels.
-            </p>
-
-            </div>
-            """,
-            unsafe_allow_html=True
-        )
-
-    with c3:
-
-        st.markdown(
-            """
-            <div class="info-card">
-
-            <h3>🧭 Route Planning</h3>
-
-            <p>
-            Compare shortest, balanced and risk-aware
-            navigation routes.
-            </p>
-
-            </div>
-            """,
-            unsafe_allow_html=True
-        )
-
-    st.markdown("")
-
-    # Main overview map
-
-    if not combined.empty:
-
-        st.plotly_chart(
-            create_risk_map(
-                combined,
-                combined_col,
-                "Combined Antarctic Environmental Risk",
-                marker_size=5
-            ),
-            width="stretch",
-            key="overview_risk_map"
-        )
-
-    else:
-
-        st.info(
-            "Combined navigation risk data is not available."
-        )
-
-    # Dataset status
-
-    st.markdown(
-        '<div class="section-title">📦 Dataset Status</div>',
-        unsafe_allow_html=True
-    )
-
-    status_rows = [
-        {
-            "Environmental Layer": "Sea Ice",
-            "Status": "Available" if not sea_ice.empty else "Missing",
-            "Records": len(sea_ice)
-        },
-        {
-            "Environmental Layer": "Iceberg Risk",
-            "Status": "Available" if not iceberg_risk.empty else "Missing",
-            "Records": len(iceberg_risk)
-        },
-        {
-            "Environmental Layer": "Iceberg Trajectory",
-            "Status": (
-                "Available"
-                if not iceberg_trajectory.empty
-                else "Missing"
-            ),
-            "Records": len(iceberg_trajectory)
-        },
-        {
-            "Environmental Layer": "Combined Risk",
-            "Status": "Available" if not combined.empty else "Missing",
-            "Records": len(combined)
-        },
-        {
-            "Environmental Layer": "Risk-Aware Route",
-            "Status": (
-                "Available"
-                if not risk_aware_route.empty
-                else "Missing"
-            ),
-            "Records": len(risk_aware_route)
-        },
-    ]
-
-    st.dataframe(
-        pd.DataFrame(status_rows),
-        width="stretch",
-        hide_index=True
-    )
-
-
-# ============================================================
-# COMBINED RISK
-# ============================================================
-
-elif layer == "Combined Risk":
-
-    st.markdown(
-        '<div class="section-title">'
-        '🌐 Combined Navigation Risk'
-        '</div>',
-        unsafe_allow_html=True
-    )
-
-    st.markdown(
-        '<div class="section-subtitle">'
-        'The combined risk surface brings environmental hazards '
-        'together into one view for navigation assessment.'
-        '</div>',
-        unsafe_allow_html=True
-    )
-
-    if combined.empty:
-
-        st.error(
-            "Combined risk file is missing or could not be loaded."
-        )
-
-    else:
-
-        fig = create_risk_map(
-            combined,
-            combined_col,
-            "Antarctic Combined Navigation Risk",
-            marker_size=6
-        )
-
-        st.plotly_chart(
-            fig,
-            width="stretch",
-            key="combined_navigation_risk_map"
-        )
-
-        a, b, c = st.columns(3)
-
-        a.metric(
-            "Risk Surface Points",
-            f"{len(combined):,}"
-        )
-
-        b.metric(
-            "Mean Risk",
-            f"{average_risk:.2f}"
-        )
-
-        c.metric(
-            "Peak Risk",
-            f"{maximum_risk:.2f}"
-        )
-
-        if "combined_risk_level" in combined.columns:
-
-            distribution = (
-                combined["combined_risk_level"]
-                .value_counts()
-                .rename_axis("Risk Level")
-                .reset_index(
-                    name="Observations"
-                )
-            )
-
-            st.markdown(
-                '<div class="section-title">'
-                '📊 Risk Distribution'
-                '</div>',
-                unsafe_allow_html=True
-            )
-
-            fig_dist = px.bar(
-                distribution,
-                x="Risk Level",
-                y="Observations",
-                text="Observations"
-            )
-
-            fig_dist.update_layout(
-                height=400,
-                paper_bgcolor="#e8f5fb",
-                plot_bgcolor="#ffffff",
-                font=dict(
-                    color="#173b56"
-                ),
-                title=dict(
-                    text="Navigation Risk Categories",
-                    font=dict(
-                        color="#0a3552"
-                    )
-                ),
-                margin=dict(
-                    l=20,
-                    r=20,
-                    t=60,
-                    b=20
-                )
-            )
-
-            fig_dist.update_traces(
-                textposition="auto"
-            )
-
-            st.plotly_chart(
-                fig_dist,
-                width="stretch",
-                key="combined_risk_distribution"
-            )
-
-
-# ============================================================
-# SEA ICE
-# ============================================================
-
-elif layer == "Sea-Ice":
-
-    st.markdown(
-        '<div class="section-title">'
-        '🧊 Sea-Ice Analysis'
-        '</div>',
-        unsafe_allow_html=True
-    )
-
-    st.markdown(
-        '<div class="section-subtitle">'
-        'Explore sea-ice concentration and the associated '
-        'navigation-risk layer.'
-        '</div>',
-        unsafe_allow_html=True
-    )
-
-    if sea_ice.empty:
-
-        st.error(
-            "Sea-ice risk file is missing or could not be loaded."
-        )
-
-    else:
-
-        fig = create_risk_map(
-            sea_ice,
-            sea_ice_col,
-            "Antarctic Sea-Ice Risk",
-            marker_size=6
-        )
-
-        st.plotly_chart(
-            fig,
-            width="stretch",
-            key="sea_ice_risk_map"
-        )
-
-        predicted_col = first_existing_column(
-            sea_ice,
-            [
-                "predicted_sea_ice_concentration",
-                "sea_ice_concentration"
-            ]
-        )
-
-        a, b, c = st.columns(3)
-
-        a.metric(
-            "Grid Cells",
-            f"{len(sea_ice):,}"
-        )
-
-        if predicted_col:
-
-            sic_values = pd.to_numeric(
-                sea_ice[predicted_col],
-                errors="coerce"
-            ).dropna()
-
-            mean_sic = (
-                sic_values.mean()
-                if not sic_values.empty
-                else np.nan
-            )
-
-            b.metric(
-                "Mean Sea-Ice Concentration",
-                f"{mean_sic:.1f}%"
-                if not np.isnan(mean_sic)
-                else "N/A"
+            st.success(
+                f"✓ {name} connected"
             )
 
         else:
 
-            b.metric(
-                "Mean Sea-Ice Concentration",
-                "N/A"
+            st.warning(
+                f"⚠ {name} unavailable"
             )
 
-        if sea_ice_col:
 
-            sea_values = pd.to_numeric(
-                sea_ice[sea_ice_col],
-                errors="coerce"
-            ).dropna()
+# ============================================================
+# PREPARE GEOSPATIAL DATA
+# ============================================================
 
-            max_sic_risk = (
-                sea_values.max()
-                if not sea_values.empty
-                else np.nan
-            )
+bathy_grid = None
+risk_grid = None
+bed_lat = None
+bed_lon = None
 
-            c.metric(
-                "Maximum Ice Risk",
-                f"{max_sic_risk:.1f}"
-                if not np.isnan(max_sic_risk)
-                else "N/A"
-            )
+if bed_data["available"]:
 
-        else:
+    bed = bed_data["bed"]
+    bed_mask = bed_data["mask"]
 
-            c.metric(
-                "Maximum Ice Risk",
-                "N/A"
-            )
+    bed_lat = bed_data["lat"]
+    bed_lon = bed_data["lon"]
 
-        preview_cols = [
-            col
-            for col in [
-                "latitude",
-                "longitude",
-                "sea_ice_concentration",
-                "predicted_sea_ice_concentration",
-                "sea_ice_risk_score",
-                "sea_ice_risk_level"
+    ocean = bed_data["ocean"]
+
+    bathy_grid = np.where(
+        ocean,
+        bed,
+        np.nan
+    )
+
+
+# ============================================================
+# HELPER — NEAREST SPATIAL DATA
+# ============================================================
+
+def nearest_values(
+    source_lat,
+    source_lon,
+    source_values,
+    target_lat,
+    target_lon
+):
+
+    source_lat = np.asarray(
+        source_lat
+    ).ravel()
+
+    source_lon = np.asarray(
+        source_lon
+    ).ravel()
+
+    source_values = np.asarray(
+        source_values
+    ).ravel()
+
+    valid = (
+        np.isfinite(source_lat)
+        &
+        np.isfinite(source_lon)
+        &
+        np.isfinite(source_values)
+    )
+
+    source_points = np.column_stack(
+        [
+            source_lat[valid],
+            source_lon[valid]
+        ]
+    )
+
+    source_values = source_values[valid]
+
+    if len(source_points) == 0:
+
+        return np.zeros_like(
+            target_lat,
+            dtype=float
+        )
+
+    tree = cKDTree(
+        source_points
+    )
+
+    target_points = np.column_stack(
+        [
+            np.asarray(target_lat).ravel(),
+            np.asarray(target_lon).ravel()
+        ]
+    )
+
+    _, idx = tree.query(
+        target_points,
+        k=1
+    )
+
+    result = source_values[idx]
+
+    return result.reshape(
+        np.asarray(target_lat).shape
+    )
+
+
+# ============================================================
+# BUILD RISK GRID
+# ============================================================
+
+if bed_data["available"]:
+
+    rows, cols = bed.shape
+
+    # Sea ice
+    if sea_data["available"]:
+
+        ice_df = sea_data["data"]
+
+        ice_grid = nearest_values(
+            ice_df["latitude"].values,
+            ice_df["longitude"].values,
+            ice_df["ice"].values,
+            bed_lat,
+            bed_lon
+        )
+
+    else:
+
+        ice_grid = np.zeros_like(
+            bed,
+            dtype=float
+        )
+
+    # Current
+    if current_data["available"]:
+
+        current_df = current_data["data"]
+
+        current_grid = nearest_values(
+            current_df["latitude"].values,
+            current_df["longitude"].values,
+            current_df["speed"].values,
+            bed_lat,
+            bed_lon
+        )
+
+    else:
+
+        current_grid = np.zeros_like(
+            bed,
+            dtype=float
+        )
+
+    # Bathymetry risk
+    depth = np.abs(
+        np.minimum(bed, 0)
+    )
+
+    depth_risk = 1 - np.clip(
+        depth / 6000,
+        0,
+        1
+    )
+
+    # Current risk
+    current_risk = np.clip(
+        current_grid / 1.5,
+        0,
+        1
+    )
+
+    # Sea ice risk
+    ice_risk = np.clip(
+        ice_grid / 100,
+        0,
+        1
+    )
+
+    # Iceberg proximity
+    iceberg_risk = np.zeros_like(
+        bed,
+        dtype=float
+    )
+
+    if iceberg_data["available"]:
+
+        iceberg_df = iceberg_data["data"]
+
+        points = np.column_stack(
+            [
+                iceberg_df["latitude"],
+                iceberg_df["longitude"]
             ]
-            if col in sea_ice.columns
+        )
+
+        tree = cKDTree(points)
+
+        target = np.column_stack(
+            [
+                bed_lat.ravel(),
+                bed_lon.ravel()
+            ]
+        )
+
+        distance, _ = tree.query(
+            target,
+            k=1
+        )
+
+        # Approximately 1 degree ≈ 111 km
+        iceberg_distance_km = distance * 111
+
+        iceberg_risk = np.exp(
+            -iceberg_distance_km / 120
+        )
+
+        iceberg_risk = iceberg_risk.reshape(
+            bed.shape
+        )
+
+    # Weighted composite risk
+    risk_grid = (
+        ice_risk * ice_weight
+        +
+        current_risk * current_weight
+        +
+        depth_risk * bathy_weight
+        +
+        iceberg_risk * iceberg_weight
+    ) / total_weight
+
+    risk_grid *= 100
+
+    risk_grid = np.where(
+        ocean,
+        risk_grid,
+        np.nan
+    )
+
+
+# ============================================================
+# TABS
+# ============================================================
+
+tab_map, tab_location, tab_seaice, tab_icebergs, tab_route = st.tabs(
+    [
+        "🗺️ Risk Map",
+        "📍 Location Assessment",
+        "🧊 Sea Ice",
+        "🚨 Icebergs",
+        "🧭 Route Planner"
+    ]
+)
+
+
+# ============================================================
+# TAB 1 — MAP
+# ============================================================
+
+with tab_map:
+
+    st.markdown(
+        '<div class="section-title">'
+        'Environmental Risk Map'
+        '</div>',
+        unsafe_allow_html=True
+    )
+
+    st.markdown(
+        '<div class="section-subtitle">'
+        'Integrated view of Antarctic environmental conditions.'
+        '</div>',
+        unsafe_allow_html=True
+    )
+
+    if not bed_data["available"]:
+
+        st.warning(
+            "BedMachine is not available in this deployment. "
+            "Add the BedMachine-derived grid to the repository to "
+            "activate the full risk map."
+        )
+
+    fig = go.Figure()
+
+    # --------------------------------------------------------
+    # Risk
+    # --------------------------------------------------------
+
+    if (
+        show_risk
+        and risk_grid is not None
+    ):
+
+        # Reduce display density
+        stride = max(
+            1,
+            risk_grid.shape[0] // 90
+        )
+
+        r = risk_grid[
+            ::stride,
+            ::stride
         ]
 
-        if preview_cols:
+        la = bed_lat[
+            ::stride,
+            ::stride
+        ]
 
-            st.markdown(
-                '<div class="section-title">'
-                '📋 Sea-Ice Observations'
-                '</div>',
-                unsafe_allow_html=True
-            )
+        lo = bed_lon[
+            ::stride,
+            ::stride
+        ]
 
-            st.dataframe(
-                sea_ice[preview_cols].head(100),
-                width="stretch",
-                hide_index=True
-            )
-
-
-# ============================================================
-# ICEBERGS
-# ============================================================
-
-elif layer == "Icebergs":
-
-    st.markdown(
-        '<div class="section-title">'
-        '🧊 Iceberg Monitoring'
-        '</div>',
-        unsafe_allow_html=True
-    )
-
-    st.markdown(
-        '<div class="section-subtitle">'
-        'Track iceberg observations, risk levels and predicted movement.'
-        '</div>',
-        unsafe_allow_html=True
-    )
-
-    if iceberg_risk.empty:
-
-        st.error(
-            "Iceberg risk file is missing or could not be loaded."
-        )
-
-    else:
-
-        fig = create_risk_map(
-            iceberg_risk,
-            iceberg_col,
-            "Antarctic Iceberg Risk",
-            marker_size=9
-        )
-
-        st.plotly_chart(
-            fig,
-            width="stretch",
-            key="iceberg_risk_map"
-        )
-
-        a, b, c = st.columns(3)
-
-        if "iceberg_id" in iceberg_risk.columns:
-
-            a.metric(
-                "Tracked Icebergs",
-                f"{iceberg_risk['iceberg_id'].nunique():,}"
-            )
-
-        else:
-
-            a.metric(
-                "Tracked Icebergs",
-                "N/A"
-            )
-
-        if "prediction_error_km" in iceberg_risk.columns:
-
-            error_values = pd.to_numeric(
-                iceberg_risk["prediction_error_km"],
-                errors="coerce"
-            ).dropna()
-
-            median_error = (
-                error_values.median()
-                if not error_values.empty
-                else np.nan
-            )
-
-            b.metric(
-                "Median Prediction Error",
-                f"{median_error:.2f} km"
-                if not np.isnan(median_error)
-                else "N/A"
-            )
-
-        else:
-
-            b.metric(
-                "Median Prediction Error",
-                "N/A"
-            )
-
-        if iceberg_col:
-
-            iceberg_values = pd.to_numeric(
-                iceberg_risk[iceberg_col],
-                errors="coerce"
-            ).dropna()
-
-            max_iceberg_risk = (
-                iceberg_values.max()
-                if not iceberg_values.empty
-                else np.nan
-            )
-
-            c.metric(
-                "Maximum Iceberg Risk",
-                f"{max_iceberg_risk:.1f}"
-                if not np.isnan(max_iceberg_risk)
-                else "N/A"
-            )
-
-        else:
-
-            c.metric(
-                "Maximum Iceberg Risk",
-                "N/A"
-            )
-
-        # Risk distribution
-
-        if "iceberg_risk_level" in iceberg_risk.columns:
-
-            distribution = (
-                iceberg_risk["iceberg_risk_level"]
-                .value_counts()
-                .rename_axis("Risk Level")
-                .reset_index(
-                    name="Observations"
-                )
-            )
-
-            st.markdown(
-                '<div class="section-title">'
-                '📊 Iceberg Risk Distribution'
-                '</div>',
-                unsafe_allow_html=True
-            )
-
-            fig_dist = px.bar(
-                distribution,
-                x="Risk Level",
-                y="Observations",
-                text="Observations"
-            )
-
-            fig_dist.update_layout(
-                height=400,
-                paper_bgcolor="#e8f5fb",
-                plot_bgcolor="#ffffff",
-                font=dict(
-                    color="#173b56"
-                ),
-                title=dict(
-                    text="Iceberg Risk Categories",
-                    font=dict(
-                        color="#0a3552"
+        fig.add_trace(
+            go.Scattergeo(
+                lat=la.ravel(),
+                lon=lo.ravel(),
+                mode="markers",
+                marker=dict(
+                    size=5,
+                    color=r.ravel(),
+                    colorscale=[
+                        [0.00, "#16a34a"],
+                        [0.35, "#84cc16"],
+                        [0.55, "#facc15"],
+                        [0.75, "#fb923c"],
+                        [1.00, "#dc2626"]
+                    ],
+                    cmin=0,
+                    cmax=100,
+                    opacity=0.78,
+                    colorbar=dict(
+                        title="Risk",
+                        ticksuffix=""
                     )
+                ),
+                name="Environmental Risk",
+                customdata=np.column_stack(
+                    [
+                        la.ravel(),
+                        lo.ravel(),
+                        r.ravel()
+                    ]
+                ),
+                hovertemplate=(
+                    "<b>Environmental Risk</b><br>"
+                    "Latitude: %{customdata[0]:.2f}°<br>"
+                    "Longitude: %{customdata[1]:.2f}°<br>"
+                    "Risk: %{customdata[2]:.1f}/100"
+                    "<extra></extra>"
+                )
+            )
+        )
+
+    # --------------------------------------------------------
+    # Bathymetry
+    # --------------------------------------------------------
+
+    if (
+        show_bathymetry
+        and bathy_grid is not None
+    ):
+
+        stride = max(
+            1,
+            bathy_grid.shape[0] // 80
+        )
+
+        z = bathy_grid[
+            ::stride,
+            ::stride
+        ]
+
+        la = bed_lat[
+            ::stride,
+            ::stride
+        ]
+
+        lo = bed_lon[
+            ::stride,
+            ::stride
+        ]
+
+        fig.add_trace(
+            go.Scattergeo(
+                lat=la.ravel(),
+                lon=lo.ravel(),
+                mode="markers",
+                marker=dict(
+                    size=4,
+                    color=z.ravel(),
+                    colorscale="Blues",
+                    reversescale=False,
+                    opacity=0.65,
+                    colorbar=dict(
+                        title="Bed (m)"
+                    )
+                ),
+                name="Bathymetry",
+                hovertemplate=(
+                    "Bed depth: %{marker.color:.0f} m"
+                    "<extra></extra>"
+                )
+            )
+        )
+
+    # --------------------------------------------------------
+    # Sea Ice
+    # --------------------------------------------------------
+
+    if (
+        show_sea_ice
+        and sea_data["available"]
+    ):
+
+        df = sea_data["data"]
+
+        fig.add_trace(
+            go.Scattergeo(
+                lat=df["latitude"],
+                lon=df["longitude"],
+                mode="markers",
+                marker=dict(
+                    size=4,
+                    color=df["ice"],
+                    colorscale="Blues",
+                    cmin=0,
+                    cmax=100,
+                    opacity=0.65,
+                    colorbar=dict(
+                        title="Ice %"
+                    )
+                ),
+                name="Sea Ice",
+                hovertemplate=(
+                    "Sea ice: %{marker.color:.0f}%"
+                    "<br>Lat: %{lat:.2f}°"
+                    "<br>Lon: %{lon:.2f}°"
+                    "<extra></extra>"
+                )
+            )
+        )
+
+    # --------------------------------------------------------
+    # Currents
+    # --------------------------------------------------------
+
+    if (
+        show_currents
+        and current_data["available"]
+    ):
+
+        df = current_data["data"]
+
+        # Keep a manageable number of arrows
+        if len(df) > 500:
+            df = df.sample(
+                500,
+                random_state=42
+            )
+
+        for _, row in df.iterrows():
+
+            scale = 1.2
+
+            fig.add_trace(
+                go.Scattergeo(
+                    lat=[
+                        row["latitude"],
+                        row["latitude"]
+                        + row["v_current"] * scale
+                    ],
+                    lon=[
+                        row["longitude"],
+                        row["longitude"]
+                        + row["u_current"] * scale
+                    ],
+                    mode="lines",
+                    line=dict(
+                        color=CYAN,
+                        width=1.5
+                    ),
+                    showlegend=False,
+                    hoverinfo="skip"
                 )
             )
 
-            st.plotly_chart(
-                fig_dist,
-                width="stretch",
-                key="iceberg_distribution"
+    # --------------------------------------------------------
+    # Icebergs
+    # --------------------------------------------------------
+
+    if (
+        show_icebergs
+        and iceberg_data["available"]
+    ):
+
+        df = iceberg_data["data"]
+
+        fig.add_trace(
+            go.Scattergeo(
+                lat=df["latitude"],
+                lon=df["longitude"],
+                mode="markers+text",
+                text=df["iceberg"],
+                textposition="top center",
+                marker=dict(
+                    size=10,
+                    color=RED,
+                    symbol="diamond",
+                    line=dict(
+                        color=WHITE,
+                        width=1
+                    )
+                ),
+                name="Icebergs",
+                hovertemplate=(
+                    "<b>%{text}</b><br>"
+                    "Latitude: %{lat:.2f}°<br>"
+                    "Longitude: %{lon:.2f}°"
+                    "<extra></extra>"
+                )
             )
+        )
 
+    # --------------------------------------------------------
+    # Map
+    # --------------------------------------------------------
 
-# ============================================================
-# ROUTES
-# ============================================================
-
-elif layer == "Routes":
-
-    st.markdown(
-        '<div class="section-title">'
-        '🧭 Safer Route Planning'
-        '</div>',
-        unsafe_allow_html=True
+    fig.update_geos(
+        projection_type="stereographic",
+        center=dict(
+            lat=-90,
+            lon=0
+        ),
+        projection_scale=1.35,
+        showland=True,
+        landcolor="#dbeaf3",
+        showocean=True,
+        oceancolor="#eaf6ff",
+        showcoastlines=True,
+        coastlinecolor="#315b73",
+        coastlinewidth=1,
+        showcountries=False,
+        showlakes=False,
+        lataxis=dict(
+            range=[-90, -48]
+        )
     )
 
-    st.markdown(
-        '<div class="section-subtitle">'
-        f'Compare navigation options for '
-        f'<b>{origin}</b> → <b>{destination}</b>.'
-        '</div>',
-        unsafe_allow_html=True
+    fig.update_layout(
+        height=650,
+        margin=dict(
+            l=5,
+            r=5,
+            t=10,
+            b=5
+        ),
+        paper_bgcolor="rgba(0,0,0,0)",
+        plot_bgcolor="rgba(0,0,0,0)",
+        font=dict(
+            color=TEXT
+        ),
+        legend=dict(
+            orientation="h",
+            y=0.02,
+            x=0.02,
+            bgcolor="rgba(255,255,255,0.85)"
+        )
     )
 
     st.plotly_chart(
-        create_route_map(),
-        width="stretch",
-        key="route_comparison_map"
-    )
-
-    route_rows = []
-
-    for name, route_df in [
-
-        (
-            "Shortest",
-            shortest_route
-        ),
-
-        (
-            "Balanced",
-            balanced_route
-        ),
-
-        (
-            "Risk-Aware",
-            risk_aware_route
-        ),
-
-    ]:
-
-        if route_df.empty:
-            continue
-
-        rcol = first_existing_column(
-            route_df,
-            [
-                "combined_risk_score",
-                "combined_risk",
-                "risk_score"
-            ]
-        )
-
-        if rcol:
-
-            risks = pd.to_numeric(
-                route_df[rcol],
-                errors="coerce"
-            ).dropna()
-
-            mean_risk = (
-                risks.mean()
-                if not risks.empty
-                else np.nan
-            )
-
-            max_risk = (
-                risks.max()
-                if not risks.empty
-                else np.nan
-            )
-
-        else:
-
-            mean_risk = np.nan
-            max_risk = np.nan
-
-        route_rows.append(
-            {
-                "Route": name,
-
-                "Distance (km)": (
-                    route_distance(route_df)
-                ),
-
-                "Mean Risk": mean_risk,
-
-                "Max Risk": max_risk,
-
-                "Waypoints": len(route_df)
-            }
-        )
-
-    if route_rows:
-
-        st.markdown(
-            '<div class="section-title">'
-            '📊 Route Comparison'
-            '</div>',
-            unsafe_allow_html=True
-        )
-
-        route_table = pd.DataFrame(
-            route_rows
-        )
-
-        st.dataframe(
-            route_table,
-            width="stretch",
-            hide_index=True
-        )
-
-        # Recommendation
-
-        if (
-            "Mean Risk" in route_table.columns
-            and route_table["Mean Risk"].notna().any()
-        ):
-
-            safest_idx = route_table[
-                "Mean Risk"
-            ].idxmin()
-
-            safest_route = route_table.loc[
-                safest_idx,
-                "Route"
-            ]
-
-            st.markdown(
-                f"""
-                <div class="route-card">
-
-                <h3>🧭 Recommended Option</h3>
-
-                <p>
-                Based on the available route risk values,
-                <b>{safest_route}</b> has the lowest mean
-                environmental risk among the displayed routes.
-                </p>
-
-                <p>
-                Safety preference selected:
-                <b>{safety_preference}%</b>
-                </p>
-
-                </div>
-                """,
-                unsafe_allow_html=True
-            )
-
-    if not route_comparison.empty:
-
-        st.markdown(
-            '<div class="section-title">'
-            '📁 Stored Optimization Results'
-            '</div>',
-            unsafe_allow_html=True
-        )
-
-        st.dataframe(
-            route_comparison,
-            width="stretch",
-            hide_index=True
-        )
-
-
-# ============================================================
-# ICEBERG TRAJECTORY EXPLORER
-# ============================================================
-
-st.markdown("---")
-
-st.markdown(
-    '<div class="section-title">'
-    '📍 Iceberg Trajectory Explorer'
-    '</div>',
-    unsafe_allow_html=True
-)
-
-st.markdown(
-    '<div class="section-subtitle">'
-    'Select an iceberg to inspect its observed and predicted path.'
-    '</div>',
-    unsafe_allow_html=True
-)
-
-
-if (
-    not iceberg_trajectory.empty
-    and "iceberg_id" in iceberg_trajectory.columns
-):
-
-    iceberg_ids = sorted(
-        iceberg_trajectory["iceberg_id"]
-        .dropna()
-        .unique()
-        .tolist()
-    )
-
-    if iceberg_ids:
-
-        selected_iceberg = st.selectbox(
-            "Select Iceberg",
-            iceberg_ids,
-            key="iceberg_selector"
-        )
-
-        selected = iceberg_trajectory[
-            iceberg_trajectory["iceberg_id"]
-            == selected_iceberg
-        ].copy()
-
-        if "datetime" in selected.columns:
-
-            selected["datetime"] = pd.to_datetime(
-                selected["datetime"],
-                errors="coerce"
-            )
-
-            selected = selected.sort_values(
-                "datetime"
-            )
-
-        fig = go.Figure()
-
-        # Observed path
-
-        if {
-            "latitude",
-            "longitude"
-        }.issubset(selected.columns):
-
-            fig.add_trace(
-                go.Scattergeo(
-
-                    lon=selected["longitude"],
-                    lat=selected["latitude"],
-
-                    mode="lines+markers",
-
-                    line=dict(
-                        width=3
-                    ),
-
-                    marker=dict(
-                        size=5
-                    ),
-
-                    name="Observed",
-
-                    hovertemplate=(
-                        "Latitude: %{lat:.3f}°<br>"
-                        "Longitude: %{lon:.3f}°"
-                        "<extra>Observed</extra>"
-                    )
-                )
-            )
-
-        # Predicted path
-
-        if {
-            "predicted_latitude",
-            "predicted_longitude"
-        }.issubset(selected.columns):
-
-            fig.add_trace(
-                go.Scattergeo(
-
-                    lon=selected[
-                        "predicted_longitude"
-                    ],
-
-                    lat=selected[
-                        "predicted_latitude"
-                    ],
-
-                    mode="lines+markers",
-
-                    line=dict(
-                        width=3,
-                        dash="dash"
-                    ),
-
-                    marker=dict(
-                        size=5
-                    ),
-
-                    name="Predicted",
-
-                    hovertemplate=(
-                        "Latitude: %{lat:.3f}°<br>"
-                        "Longitude: %{lon:.3f}°"
-                        "<extra>Predicted</extra>"
-                    )
-                )
-            )
-
-        fig.update_geos(
-            **polar_geo_settings()
-        )
-
-        fig.update_layout(
-
-            title=dict(
-                text=(
-                    f"Iceberg {selected_iceberg} — "
-                    "Observed vs Predicted"
-                ),
-                font=dict(
-                    color="#0a3552"
-                )
-            ),
-
-            height=550,
-
-            margin=dict(
-                l=0,
-                r=0,
-                t=60,
-                b=0
-            ),
-
-            paper_bgcolor="#e8f5fb",
-
-            font=dict(
-                color="#173b56"
-            ),
-
-            legend=dict(
-                bgcolor="rgba(255,255,255,0.78)"
-            ),
-
-            uirevision="iceberg-trajectory"
-        )
-
-        st.plotly_chart(
-            fig,
-            width="stretch",
-            key="iceberg_trajectory_map"
-        )
-
-        if "prediction_error_km" in selected.columns:
-
-            error_values = pd.to_numeric(
-                selected["prediction_error_km"],
-                errors="coerce"
-            ).dropna()
-
-            if not error_values.empty:
-
-                c1, c2 = st.columns(2)
-
-                c1.metric(
-                    "Mean Prediction Error",
-                    f"{error_values.mean():.2f} km"
-                )
-
-                c2.metric(
-                    "Maximum Prediction Error",
-                    f"{error_values.max():.2f} km"
-                )
-
-else:
-
-    st.info(
-        "Iceberg trajectory data is not available yet."
+        fig,
+        use_container_width=True,
+        key="environmental_risk_map",
+        config={
+            "displayModeBar": False,
+            "responsive": True
+        }
     )
 
 
 # ============================================================
-# LOCATION ASSESSMENT
+# TAB 2 — LOCATION ASSESSMENT
 # ============================================================
 
-st.markdown("---")
+with tab_location:
 
-st.markdown(
-    '<div class="section-title">'
-    '📍 Location Assessment'
-    '</div>',
-    unsafe_allow_html=True
-)
-
-st.markdown(
-    '<div class="section-subtitle">'
-    'Enter a location to inspect its available environmental risk.'
-    '</div>',
-    unsafe_allow_html=True
-)
-
-
-c1, c2, c3 = st.columns(
-    [1, 1, 1]
-)
-
-with c1:
-
-    latitude = st.number_input(
-        "Latitude",
-        min_value=-90.0,
-        max_value=-48.0,
-        value=-65.0,
-        step=0.1,
-        key="assessment_lat"
+    st.markdown(
+        '<div class="section-title">'
+        '📍 Location Assessment'
+        '</div>',
+        unsafe_allow_html=True
     )
 
-with c2:
-
-    longitude = st.number_input(
-        "Longitude",
-        min_value=-180.0,
-        max_value=180.0,
-        value=20.0,
-        step=0.1,
-        key="assessment_lon"
+    st.markdown(
+        '<div class="section-subtitle">'
+        'Select a location to inspect the environmental conditions '
+        'at the nearest available data cell.'
+        '</div>',
+        unsafe_allow_html=True
     )
 
-with c3:
+    col1, col2 = st.columns(2)
 
-    st.write("")
+    with col1:
 
-    st.write("")
+        latitude = st.number_input(
+            "Latitude",
+            min_value=-90.0,
+            max_value=-48.0,
+            value=-67.568,
+            step=0.01
+        )
+
+    with col2:
+
+        longitude = st.number_input(
+            "Longitude",
+            min_value=-180.0,
+            max_value=180.0,
+            value=-68.129,
+            step=0.01
+        )
 
     assess = st.button(
         "🔍 Assess Location",
         use_container_width=True
     )
 
+    if assess:
 
-if assess:
+        if not bed_data["available"]:
 
-    # --------------------------------------------------------
-    # Find nearest available combined-risk observation
-    # --------------------------------------------------------
+            st.warning(
+                "BedMachine is required for the full "
+                "location risk assessment."
+            )
 
-    location_risk = None
+        else:
 
-    nearest_row = None
+            distance = (
+                (bed_lat - latitude) ** 2
+                +
+                (bed_lon - longitude) ** 2
+            )
 
-    if (
-        not combined.empty
-        and combined_col
-        and {
-            "latitude",
-            "longitude"
-        }.issubset(combined.columns)
-    ):
+            distance[
+                ~np.isfinite(distance)
+            ] = np.inf
 
-        work = combined.copy()
+            idx = np.unravel_index(
+                np.argmin(distance),
+                distance.shape
+            )
 
-        work["_distance"] = np.sqrt(
-            (
-                work["latitude"]
-                - latitude
-            ) ** 2
-            +
-            (
-                work["longitude"]
-                - longitude
-            ) ** 2
-        )
+            row, col = idx
 
-        nearest_idx = work[
-            "_distance"
-        ].idxmin()
+            nearest_lat = bed_lat[
+                row,
+                col
+            ]
 
-        nearest_row = work.loc[
-            nearest_idx
-        ]
+            nearest_lon = bed_lon[
+                row,
+                col
+            ]
 
-        location_risk = pd.to_numeric(
-            nearest_row[
-                combined_col
-            ],
-            errors="coerce"
-        )
+            score = risk_grid[
+                row,
+                col
+            ]
 
-    # Fallback only if combined data is unavailable
+            if not np.isfinite(score):
+                score = 0
 
-    if location_risk is None or pd.isna(location_risk):
+            bed_value = bed[
+                row,
+                col
+            ]
 
-        location_risk = 0
+            slope_value = bed_data[
+                "slope"
+            ][
+                row,
+                col
+            ]
 
-        st.warning(
-            "No valid combined-risk value was found "
-            "near this location."
-        )
+            # Get local sea ice
+            local_ice = 0
 
-    location_risk = float(
-        np.clip(
-            location_risk,
-            0,
-            100
-        )
-    )
+            if sea_data["available"]:
 
-    st.markdown("---")
+                local_ice = nearest_values(
+                    sea_data["data"]["latitude"],
+                    sea_data["data"]["longitude"],
+                    sea_data["data"]["ice"],
+                    np.array([[latitude]]),
+                    np.array([[longitude]])
+                )[0, 0]
+
+            # Get current
+            local_current = 0
+
+            if current_data["available"]:
+
+                local_current = nearest_values(
+                    current_data["data"]["latitude"],
+                    current_data["data"]["longitude"],
+                    current_data["data"]["speed"],
+                    np.array([[latitude]]),
+                    np.array([[longitude]])
+                )[0, 0]
+
+            # Find nearby iceberg
+            iceberg_distance = None
+            nearest_berg = None
+
+            if iceberg_data["available"]:
+
+                iceberg_df = iceberg_data["data"]
+
+                distances = (
+                    (
+                        iceberg_df["latitude"]
+                        - latitude
+                    ) ** 2
+                    +
+                    (
+                        iceberg_df["longitude"]
+                        - longitude
+                    ) ** 2
+                )
+
+                nearest_idx = distances.idxmin()
+
+                nearest_berg = iceberg_df.loc[
+                    nearest_idx,
+                    "iceberg"
+                ]
+
+                iceberg_distance = math.sqrt(
+                    distances.loc[
+                        nearest_idx
+                    ]
+                ) * 111
+
+            st.divider()
+
+            if score >= 70:
+
+                st.markdown(
+                    f"""
+                    <div class="risk-high">
+                        <h2>🔴 HIGH ENVIRONMENTAL RISK</h2>
+                        <h1>{score:.0f}/100</h1>
+                    </div>
+                    """,
+                    unsafe_allow_html=True
+                )
+
+            elif score >= 40:
+
+                st.markdown(
+                    f"""
+                    <div class="risk-medium">
+                        <h2>🟠 MODERATE ENVIRONMENTAL RISK</h2>
+                        <h1>{score:.0f}/100</h1>
+                    </div>
+                    """,
+                    unsafe_allow_html=True
+                )
+
+            else:
+
+                st.markdown(
+                    f"""
+                    <div class="risk-low">
+                        <h2>🟢 LOWER ENVIRONMENTAL RISK</h2>
+                        <h1>{score:.0f}/100</h1>
+                    </div>
+                    """,
+                    unsafe_allow_html=True
+                )
+
+            st.markdown(
+                f"### Nearest data cell: "
+                f"{nearest_lat:.3f}°, "
+                f"{nearest_lon:.3f}°"
+            )
+
+            c1, c2, c3, c4 = st.columns(4)
+
+            with c1:
+
+                st.metric(
+                    "Sea Ice",
+                    f"{local_ice:.1f}%"
+                )
+
+            with c2:
+
+                st.metric(
+                    "Current",
+                    f"{local_current:.2f} m/s"
+                )
+
+            with c3:
+
+                st.metric(
+                    "Bed",
+                    f"{bed_value:.0f} m"
+                )
+
+            with c4:
+
+                st.metric(
+                    "Bed Slope",
+                    f"{slope_value:.3f}"
+                )
+
+            st.markdown("### Why this score?")
+
+            reasons = []
+
+            if local_ice >= 70:
+                reasons.append(
+                    "High sea-ice concentration"
+                )
+
+            elif local_ice >= 40:
+                reasons.append(
+                    "Moderate sea-ice concentration"
+                )
+
+            if local_current >= 1:
+                reasons.append(
+                    "Strong ocean current"
+                )
+
+            elif local_current >= 0.5:
+                reasons.append(
+                    "Moderate ocean current"
+                )
+
+            if bed_value > -200:
+                reasons.append(
+                    "Relatively shallow seabed"
+                )
+
+            if iceberg_distance is not None:
+
+                if iceberg_distance < 100:
+
+                    reasons.append(
+                        f"Near iceberg {nearest_berg}"
+                    )
+
+                elif iceberg_distance < 250:
+
+                    reasons.append(
+                        f"Iceberg activity within ~"
+                        f"{iceberg_distance:.0f} km"
+                    )
+
+            if not reasons:
+
+                reasons.append(
+                    "No major environmental indicator "
+                    "was detected at this location."
+                )
+
+            for reason in reasons:
+
+                st.info(
+                    f"• {reason}"
+                )
+
+
+# ============================================================
+# TAB 3 — SEA ICE ANALYSIS
+# ============================================================
+
+with tab_seaice:
 
     st.markdown(
-        f"### 📍 {latitude:.2f}°, {longitude:.2f}°"
+        '<div class="section-title">'
+        '🧊 Sea Ice Analysis'
+        '</div>',
+        unsafe_allow_html=True
     )
 
-    if location_risk >= 70:
+    st.markdown(
+        '<div class="section-subtitle">'
+        'Antarctic sea-ice concentration from the available dataset.'
+        '</div>',
+        unsafe_allow_html=True
+    )
 
-        st.markdown(
-            f"""
-            <div class="risk-high">
+    if not sea_data["available"]:
 
-                <h2>🔴 HIGH RISK</h2>
-
-                <h3>{location_risk:.1f} / 100</h3>
-
-                <p>
-                Conditions in the surrounding risk surface
-                indicate elevated environmental hazard.
-                </p>
-
-            </div>
-            """,
-            unsafe_allow_html=True
-        )
-
-    elif location_risk >= 40:
-
-        st.markdown(
-            f"""
-            <div class="risk-medium">
-
-                <h2>🟠 MODERATE RISK</h2>
-
-                <h3>{location_risk:.1f} / 100</h3>
-
-                <p>
-                Conditions indicate a moderate level
-                of environmental concern.
-                </p>
-
-            </div>
-            """,
-            unsafe_allow_html=True
+        st.error(
+            sea_data["message"]
         )
 
     else:
 
+        ice_df = sea_data["data"]
+
+        c1, c2, c3 = st.columns(3)
+
+        with c1:
+
+            st.metric(
+                "Mean concentration",
+                f"{ice_df['ice'].mean():.1f}%"
+            )
+
+        with c2:
+
+            st.metric(
+                "Maximum",
+                f"{ice_df['ice'].max():.1f}%"
+            )
+
+        with c3:
+
+            st.metric(
+                "Data points",
+                f"{len(ice_df):,}"
+            )
+
+        fig = go.Figure()
+
+        fig.add_trace(
+            go.Scattergeo(
+                lat=ice_df["latitude"],
+                lon=ice_df["longitude"],
+                mode="markers",
+                marker=dict(
+                    size=5,
+                    color=ice_df["ice"],
+                    colorscale="Blues",
+                    cmin=0,
+                    cmax=100,
+                    opacity=0.75,
+                    colorbar=dict(
+                        title="Ice %"
+                    )
+                ),
+                hovertemplate=(
+                    "<b>Sea Ice Concentration</b><br>"
+                    "%{marker.color:.1f}%<br>"
+                    "Lat: %{lat:.2f}°<br>"
+                    "Lon: %{lon:.2f}°"
+                    "<extra></extra>"
+                )
+            )
+        )
+
+        fig.update_geos(
+            projection_type="stereographic",
+            center=dict(
+                lat=-90,
+                lon=0
+            ),
+            projection_scale=1.35,
+            showland=True,
+            landcolor="#dbeaf3",
+            showocean=True,
+            oceancolor="#f3fbff",
+            showcoastlines=True,
+            coastlinecolor="#315b73"
+        )
+
+        fig.update_layout(
+            height=600,
+            margin=dict(
+                l=0,
+                r=0,
+                t=0,
+                b=0
+            ),
+            paper_bgcolor="rgba(0,0,0,0)"
+        )
+
+        st.plotly_chart(
+            fig,
+            use_container_width=True,
+            key="sea_ice_analysis_map"
+        )
+
+        st.info(
+            f"Dataset observation: {sea_data['date']}"
+        )
+
+
+# ============================================================
+# TAB 4 — ICEBERG MONITOR
+# ============================================================
+
+with tab_icebergs:
+
+    st.markdown(
+        '<div class="section-title">'
+        '🚨 Antarctic Iceberg Monitor'
+        '</div>',
+        unsafe_allow_html=True
+    )
+
+    st.markdown(
+        '<div class="section-subtitle">'
+        'Current large iceberg positions derived from satellite '
+        'scatterometer observations.'
+        '</div>',
+        unsafe_allow_html=True
+    )
+
+    if not iceberg_data["available"]:
+
+        st.error(
+            iceberg_data["message"]
+        )
+
+    else:
+
+        bergs = iceberg_data["data"]
+
+        c1, c2, c3 = st.columns(3)
+
+        with c1:
+
+            st.metric(
+                "Tracked icebergs",
+                len(bergs)
+            )
+
+        with c2:
+
+            st.metric(
+                "Southernmost",
+                f"{bergs['latitude'].min():.1f}°S"
+            )
+
+        with c3:
+
+            st.metric(
+                "Latest source",
+                "NASA SCP"
+            )
+
+        fig = go.Figure()
+
+        fig.add_trace(
+            go.Scattergeo(
+                lat=bergs["latitude"],
+                lon=bergs["longitude"],
+                mode="markers+text",
+                text=bergs["iceberg"],
+                textposition="top center",
+                marker=dict(
+                    size=11,
+                    color=RED,
+                    symbol="diamond",
+                    line=dict(
+                        color=WHITE,
+                        width=1
+                    )
+                ),
+                hovertemplate=(
+                    "<b>%{text}</b><br>"
+                    "Latitude: %{lat:.2f}°<br>"
+                    "Longitude: %{lon:.2f}°"
+                    "<extra></extra>"
+                ),
+                name="Iceberg"
+            )
+        )
+
+        fig.update_geos(
+            projection_type="stereographic",
+            center=dict(
+                lat=-90,
+                lon=0
+            ),
+            projection_scale=1.35,
+            showland=True,
+            landcolor="#dbeaf3",
+            showocean=True,
+            oceancolor="#f3fbff",
+            showcoastlines=True,
+            coastlinecolor="#315b73"
+        )
+
+        fig.update_layout(
+            height=580,
+            margin=dict(
+                l=0,
+                r=0,
+                t=0,
+                b=0
+            ),
+            paper_bgcolor="rgba(0,0,0,0)"
+        )
+
+        st.plotly_chart(
+            fig,
+            use_container_width=True,
+            key="iceberg_monitor_map"
+        )
+
+        st.markdown("### Current Iceberg Positions")
+
+        display_df = bergs.copy()
+
+        display_df.columns = [
+            "Iceberg",
+            "Latitude",
+            "Longitude",
+            "Observation"
+        ]
+
+        st.dataframe(
+            display_df,
+            use_container_width=True,
+            hide_index=True
+        )
+
+        st.caption(
+            "Iceberg tracking is supplementary environmental intelligence "
+            "and should not replace official navigation products."
+        )
+
+
+# ============================================================
+# ROUTE HELPERS
+# ============================================================
+
+def haversine_km(
+    lat1,
+    lon1,
+    lat2,
+    lon2
+):
+
+    lat1 = np.radians(lat1)
+    lat2 = np.radians(lat2)
+
+    dlat = lat2 - lat1
+
+    dlon = np.radians(
+        lon2 - lon1
+    )
+
+    a = (
+        np.sin(dlat / 2) ** 2
+        +
+        np.cos(lat1)
+        *
+        np.cos(lat2)
+        *
+        np.sin(dlon / 2) ** 2
+    )
+
+    return (
+        6371
+        *
+        2
+        *
+        np.arcsin(
+            np.sqrt(a)
+        )
+    )
+
+
+def nearest_ocean_cell(
+    lat,
+    lon,
+    grid_lat,
+    grid_lon,
+    ocean
+):
+
+    distance = (
+        (grid_lat - lat) ** 2
+        +
+        (grid_lon - lon) ** 2
+    )
+
+    distance[
+        ~ocean
+    ] = np.inf
+
+    if not np.isfinite(
+        distance
+    ).any():
+
+        return None
+
+    return np.unravel_index(
+        np.argmin(distance),
+        distance.shape
+    )
+
+
+# ============================================================
+# A* ROUTER
+# ============================================================
+
+def calculate_route(
+    risk,
+    ocean,
+    start,
+    goal,
+    ice_limit,
+    bed,
+    current_grid,
+    ice_grid
+):
+
+    rows, cols = risk.shape
+
+    blocked = ~ocean
+
+    # Ice restriction
+    blocked |= (
+        ice_grid > ice_limit
+    )
+
+    # Very shallow areas
+    blocked |= (
+        bed > -50
+    )
+
+    sr, sc = start
+    gr, gc = goal
+
+    blocked[sr, sc] = False
+    blocked[gr, gc] = False
+
+    # Make route cost
+    cost = (
+        1.0
+        +
+        np.nan_to_num(
+            risk,
+            nan=100
+        ) / 100.0 * 8
+    )
+
+    cost = np.where(
+        blocked,
+        np.inf,
+        cost
+    )
+
+    neighbors = [
+        (-1, 0, 1.0),
+        (1, 0, 1.0),
+        (0, -1, 1.0),
+        (0, 1, 1.0),
+        (-1, -1, 1.414),
+        (-1, 1, 1.414),
+        (1, -1, 1.414),
+        (1, 1, 1.414)
+    ]
+
+    import heapq
+
+    def heuristic(a, b):
+
+        return math.hypot(
+            a[0] - b[0],
+            a[1] - b[1]
+        )
+
+    open_set = []
+
+    heapq.heappush(
+        open_set,
+        (
+            heuristic(start, goal),
+            0,
+            start
+        )
+    )
+
+    came_from = {}
+
+    g_score = {
+        start: 0
+    }
+
+    visited = set()
+
+    while open_set:
+
+        _, current_cost, current = (
+            heapq.heappop(open_set)
+        )
+
+        if current in visited:
+            continue
+
+        visited.add(current)
+
+        if current == goal:
+
+            path = [
+                current
+            ]
+
+            while current in came_from:
+
+                current = came_from[
+                    current
+                ]
+
+                path.append(
+                    current
+                )
+
+            path.reverse()
+
+            return path
+
+        r, c = current
+
+        for dr, dc, step in neighbors:
+
+            nr = r + dr
+            nc = c + dc
+
+            if (
+                nr < 0
+                or nr >= rows
+                or nc < 0
+                or nc >= cols
+            ):
+                continue
+
+            if not np.isfinite(
+                cost[nr, nc]
+            ):
+                continue
+
+            new_cost = (
+                current_cost
+                +
+                cost[nr, nc] * step
+            )
+
+            neighbour = (
+                nr,
+                nc
+            )
+
+            if new_cost < g_score.get(
+                neighbour,
+                np.inf
+            ):
+
+                g_score[
+                    neighbour
+                ] = new_cost
+
+                came_from[
+                    neighbour
+                ] = current
+
+                f = (
+                    new_cost
+                    +
+                    heuristic(
+                        neighbour,
+                        goal
+                    )
+                )
+
+                heapq.heappush(
+                    open_set,
+                    (
+                        f,
+                        new_cost,
+                        neighbour
+                    )
+                )
+
+    return None
+
+
+# ============================================================
+# TAB 5 — ROUTE PLANNER
+# ============================================================
+
+with tab_route:
+
+    st.markdown(
+        '<div class="section-title">'
+        '🧭 Safer Antarctic Route Planner'
+        '</div>',
+        unsafe_allow_html=True
+    )
+
+    st.markdown(
+        '<div class="section-subtitle">'
+        'Find a route that balances distance with environmental risk.'
+        '</div>',
+        unsafe_allow_html=True
+    )
+
+    if not bed_data["available"]:
+
+        st.warning(
+            "The route planner requires the BedMachine dataset "
+            "or a derived BedMachine grid in the repository."
+        )
+
+    else:
+
+        col1, col2 = st.columns(2)
+
+        with col1:
+
+            st.markdown("### 🟢 Departure")
+
+            start_name = st.selectbox(
+                "Source",
+                list(
+                    ANTARCTIC_LOCATIONS.keys()
+                ),
+                index=0
+            )
+
+            start_lat, start_lon = (
+                ANTARCTIC_LOCATIONS[
+                    start_name
+                ]
+            )
+
+        with col2:
+
+            st.markdown("### 🔵 Destination")
+
+            destination_options = [
+                x for x in
+                ANTARCTIC_LOCATIONS.keys()
+                if x != start_name
+            ]
+
+            end_name = st.selectbox(
+                "Destination",
+                destination_options,
+                index=0
+            )
+
+            end_lat, end_lon = (
+                ANTARCTIC_LOCATIONS[
+                    end_name
+                ]
+            )
+
         st.markdown(
             f"""
-            <div class="risk-low">
+            <div class="card">
+            <b>Route:</b>
+            {start_name}
+            →
+            {end_name}
 
-                <h2>🟢 LOWER RISK</h2>
+            <br><br>
 
-                <h3>{location_risk:.1f} / 100</h3>
+            <b>Departure:</b>
+            {start_lat:.3f}°, {start_lon:.3f}°
 
-                <p>
-                The available combined risk surface
-                indicates comparatively lower risk.
-                </p>
+            <br>
 
+            <b>Destination:</b>
+            {end_lat:.3f}°, {end_lon:.3f}°
             </div>
             """,
             unsafe_allow_html=True
         )
 
-    if nearest_row is not None:
-
-        st.markdown(
-            '<div class="section-title">'
-            'Environmental Details'
-            '</div>',
-            unsafe_allow_html=True
+        route_button = st.button(
+            "🧭 CALCULATE SAFER ROUTE",
+            use_container_width=True
         )
 
-        detail_cols = [
-            col
-            for col in [
-                combined_col,
-                "combined_risk_level",
-                "sea_ice_risk_score",
-                "iceberg_risk_score",
-                "latitude",
-                "longitude"
-            ]
-            if col
-            and col in nearest_row.index
-        ]
+        if route_button:
 
-        if detail_cols:
-
-            details = nearest_row[
-                detail_cols
-            ].to_frame(
-                name="Value"
+            start = nearest_ocean_cell(
+                start_lat,
+                start_lon,
+                bed_lat,
+                bed_lon,
+                bed_data["ocean"]
             )
 
-            st.dataframe(
-                details,
-                width="stretch"
+            goal = nearest_ocean_cell(
+                end_lat,
+                end_lon,
+                bed_lat,
+                bed_lon,
+                bed_data["ocean"]
             )
 
+            if (
+                start is None
+                or goal is None
+            ):
 
-# ============================================================
-# DECISION SUMMARY
-# ============================================================
+                st.error(
+                    "Could not find navigable ocean cells "
+                    "near the selected locations."
+                )
 
-st.markdown("---")
+            else:
 
-st.markdown(
-    '<div class="section-title">'
-    '🎯 POLAR-SAFE Decision Flow'
-    '</div>',
-    unsafe_allow_html=True
-)
+                # ------------------------------------------------
+                # Rebuild route-specific risk grid
+                # ------------------------------------------------
 
-a, b, c = st.columns(3)
+                route_risk = np.nan_to_num(
+                    risk_grid,
+                    nan=100
+                )
 
-with a:
+                path = calculate_route(
+                    route_risk,
+                    bed_data["ocean"],
+                    start,
+                    goal,
+                    profile["ice_limit"],
+                    bed,
+                    current_grid,
+                    ice_grid
+                )
 
-    st.markdown(
-        """
-        <div class="info-card">
+                if path is None:
 
-        <h3>1️⃣ Understand</h3>
+                    st.error(
+                        "No viable route was found under the "
+                        "current environmental constraints."
+                    )
 
-        <p>
-        Examine sea-ice and environmental conditions
-        across the Antarctic region.
-        </p>
+                    st.info(
+                        "Try selecting a Polar Class Vessel "
+                        "or reduce the environmental constraints."
+                    )
 
-        </div>
-        """,
-        unsafe_allow_html=True
-    )
+                else:
 
-with b:
+                    path = np.array(
+                        path
+                    )
 
-    st.markdown(
-        """
-        <div class="info-card">
+                    path_lat = bed_lat[
+                        path[:, 0],
+                        path[:, 1]
+                    ]
 
-        <h3>2️⃣ Track</h3>
+                    path_lon = bed_lon[
+                        path[:, 0],
+                        path[:, 1]
+                    ]
 
-        <p>
-        Monitor iceberg locations and predicted
-        movement to identify potential hazards.
-        </p>
+                    route_risk_values = risk_grid[
+                        path[:, 0],
+                        path[:, 1]
+                    ]
 
-        </div>
-        """,
-        unsafe_allow_html=True
-    )
+                    route_ice_values = ice_grid[
+                        path[:, 0],
+                        path[:, 1]
+                    ]
 
-with c:
+                    route_current_values = current_grid[
+                        path[:, 0],
+                        path[:, 1]
+                    ]
 
-    st.markdown(
-        """
-        <div class="info-card">
+                    route_depth_values = bed[
+                        path[:, 0],
+                        path[:, 1]
+                    ]
 
-        <h3>3️⃣ Navigate</h3>
+                    # ------------------------------------------------
+                    # Distance
+                    # ------------------------------------------------
 
-        <p>
-        Compare available routes and prioritize
-        lower environmental risk.
-        </p>
+                    distance_segments = haversine_km(
+                        path_lat[:-1],
+                        path_lon[:-1],
+                        path_lat[1:],
+                        path_lon[1:]
+                    )
 
-        </div>
-        """,
-        unsafe_allow_html=True
-    )
+                    total_km = float(
+                        np.nansum(
+                            distance_segments
+                        )
+                    )
 
+                    total_nm = (
+                        total_km
+                        * 0.539957
+                    )
 
-# ============================================================
-# DATA PIPELINE
-# ============================================================
+                    direct_km = float(
+                        haversine_km(
+                            start_lat,
+                            start_lon,
+                            end_lat,
+                            end_lon
+                        )
+                    )
 
-st.markdown("---")
+                    direct_nm = (
+                        direct_km
+                        * 0.539957
+                    )
 
-with st.expander(
-    "🔄 How POLAR-SAFE Works"
-):
+                    # ------------------------------------------------
+                    # Environmental metrics
+                    # ------------------------------------------------
 
-    st.markdown(
-        """
-        **Environmental Data**
+                    max_risk = float(
+                        np.nanmax(
+                            route_risk_values
+                        )
+                    )
 
-        Sea ice + iceberg observations + trajectory
-        information + navigation-risk layers
+                    avg_risk = float(
+                        np.nanmean(
+                            route_risk_values
+                        )
+                    )
 
-        ↓
+                    max_ice = float(
+                        np.nanmax(
+                            route_ice_values
+                        )
+                    )
 
-        **Data Processing**
+                    avg_current = float(
+                        np.nanmean(
+                            route_current_values
+                        )
+                    )
 
-        Cleaning + coordinate alignment +
-        risk calculation
+                    min_depth = float(
+                        np.nanmin(
+                            route_depth_values
+                        )
+                    )
 
-        ↓
+                    # ------------------------------------------------
+                    # ETA
+                    # ------------------------------------------------
 
-        **Environmental Risk**
+                    speed = {
 
-        Individual hazard layers are combined
-        into a navigation-risk surface
+                        "Scientific Research Vessel": 12,
 
-        ↓
+                        "Standard Cargo Vessel": 16,
 
-        **Route Analysis**
+                        "Polar Class Vessel": 14
 
-        Shortest + balanced + risk-aware routes
+                    }[vessel]
 
-        ↓
+                    speed_factor = max(
+                        0.5,
+                        1 -
+                        (
+                            max_ice
+                            / 100
+                            * 0.4
+                        )
+                    )
 
-        **Navigation Decision Support**
+                    effective_speed = (
+                        speed
+                        * speed_factor
+                    )
 
-        Explore the map, assess locations and
-        compare safer route options.
-        """
-    )
+                    hours = (
+                        total_nm
+                        /
+                        max(
+                            effective_speed,
+                            1
+                        )
+                    )
+
+                    # ------------------------------------------------
+                    # Risk classification
+                    # ------------------------------------------------
+
+                    if avg_risk >= 70:
+                        risk_level = "HIGH"
+                    elif avg_risk >= 40:
+                        risk_level = "MODERATE"
+                    else:
+                        risk_level = "LOW"
+
+                    # ------------------------------------------------
+                    # Route map
+                    # ------------------------------------------------
+
+                    fig_route = go.Figure()
+
+                    if show_risk:
+
+                        stride = max(
+                            1,
+                            risk_grid.shape[0] // 70
+                        )
+
+                        r = risk_grid[
+                            ::stride,
+                            ::stride
+                        ]
+
+                        la = bed_lat[
+                            ::stride,
+                            ::stride
+                        ]
+
+                        lo = bed_lon[
+                            ::stride,
+                            ::stride
+                        ]
+
+                        fig_route.add_trace(
+                            go.Scattergeo(
+                                lat=la.ravel(),
+                                lon=lo.ravel(),
+                                mode="markers",
+                                marker=dict(
+                                    size=4,
+                                    color=r.ravel(),
+                                    colorscale=[
+                                        [0, GREEN],
+                                        [0.5, YELLOW],
+                                        [1, RED]
+                                    ],
+                                    cmin=0,
+                                    cmax=100,
+                                    opacity=0.35,
+                                    showscale=True,
+                                    colorbar=dict(
+                                        title="Risk"
+                                    )
+                                ),
+                                name="Risk"
+                            )
+                        )
+
+                    fig_route.add_trace(
+                        go.Scattergeo(
+                            lat=path_lat,
+                            lon=path_lon,
+                            mode="lines",
+                            line=dict(
+                                color="#0b2d4d",
+                                width=5
+                            ),
+                            name="Safer Route"
+                        )
+                    )
+
+                    fig_route.add_trace(
+                        go.Scattergeo(
+                            lat=[start_lat],
+                            lon=[start_lon],
+                            mode="markers+text",
+                            text=["START"],
+                            textposition="top center",
+                            marker=dict(
+                                size=14,
+                                color=GREEN,
+                                symbol="circle"
+                            ),
+                            name="Departure"
+                        )
+                    )
+
+                    fig_route.add_trace(
+                        go.Scattergeo(
+                            lat=[end_lat],
+                            lon=[end_lon],
+                            mode="markers+text",
+                            text=["DESTINATION"],
+                            textposition="top center",
+                            marker=dict(
+                                size=14,
+                                color="#2563eb",
+                                symbol="star"
+                            ),
+                            name="Destination"
+                        )
+                    )
+
+                    # Add icebergs
+                    if iceberg_data["available"]:
+
+                        bergs = iceberg_data["data"]
+
+                        fig_route.add_trace(
+                            go.Scattergeo(
+                                lat=bergs["latitude"],
+                                lon=bergs["longitude"],
+                                mode="markers",
+                                marker=dict(
+                                    size=8,
+                                    color=RED,
+                                    symbol="diamond"
+                                ),
+                                name="Icebergs",
+                                hovertemplate=(
+                                    "<b>%{text}</b>"
+                                    "<br>%{lat:.2f}°"
+                                    "<br>%{lon:.2f}°"
+                                    "<extra></extra>"
+                                ),
+                                text=bergs["iceberg"]
+                            )
+                        )
+
+                    fig_route.update_geos(
+                        projection_type="stereographic",
+                        center=dict(
+                            lat=-90,
+                            lon=0
+                        ),
+                        projection_scale=1.35,
+                        showland=True,
+                        landcolor="#dbeaf3",
+                        showocean=True,
+                        oceancolor="#f3fbff",
+                        showcoastlines=True,
+                        coastlinecolor="#315b73"
+                    )
+
+                    fig_route.update_layout(
+                        height=620,
+                        margin=dict(
+                            l=0,
+                            r=0,
+                            t=0,
+                            b=0
+                        ),
+                        paper_bgcolor="rgba(0,0,0,0)",
+                        font=dict(
+                            color=TEXT
+                        ),
+                        legend=dict(
+                            orientation="h",
+                            bgcolor="rgba(255,255,255,0.85)"
+                        )
+                    )
+
+                    st.plotly_chart(
+                        fig_route,
+                        use_container_width=True,
+                        key="route_map"
+                    )
+
+                    # ------------------------------------------------
+                    # Route KPIs
+                    # ------------------------------------------------
+
+                    st.markdown("### 📊 Route Summary")
+
+                    c1, c2, c3, c4 = st.columns(4)
+
+                    with c1:
+
+                        st.metric(
+                            "Distance",
+                            f"{total_nm:,.0f} NM"
+                        )
+
+                    with c2:
+
+                        st.metric(
+                            "Estimated time",
+                            f"{hours:.1f} hrs"
+                        )
+
+                    with c3:
+
+                        st.metric(
+                            "Average risk",
+                            f"{avg_risk:.0f}/100"
+                        )
+
+                    with c4:
+
+                        st.metric(
+                            "Maximum ice",
+                            f"{max_ice:.0f}%"
+                        )
+
+                    if risk_level == "HIGH":
+
+                        st.error(
+                            "🔴 HIGH RISK ROUTE — "
+                            "Review environmental conditions "
+                            "before transit."
+                        )
+
+                    elif risk_level == "MODERATE":
+
+                        st.warning(
+                            "🟠 MODERATE RISK ROUTE — "
+                            "Environmental conditions require monitoring."
+                        )
+
+                    else:
+
+                        st.success(
+                            "🟢 LOWER RISK ROUTE — "
+                            "No major environmental constraint "
+                            "was encountered on the calculated path."
+                        )
+
+                    # ------------------------------------------------
+                    # Route environmental profile
+                    # ------------------------------------------------
+
+                    st.markdown(
+                        "### 🌊 Environmental Profile"
+                    )
+
+                    c1, c2, c3, c4 = st.columns(4)
+
+                    with c1:
+
+                        st.metric(
+                            "Peak risk",
+                            f"{max_risk:.0f}/100"
+                        )
+
+                    with c2:
+
+                        st.metric(
+                            "Avg current",
+                            f"{avg_current:.2f} m/s"
+                        )
+
+                    with c3:
+
+                        st.metric(
+                            "Deepest bed",
+                            f"{min_depth:.0f} m"
+                        )
+
+                    with c4:
+
+                        detour = (
+                            (
+                                total_km
+                                /
+                                max(
+                                    direct_km,
+                                    1
+                                )
+                            )
+                            - 1
+                        ) * 100
+
+                        st.metric(
+                            "Route detour",
+                            f"{detour:.1f}%"
+                        )
+
+                    # ------------------------------------------------
+                    # Depth chart
+                    # ------------------------------------------------
+
+                    chart_col1, chart_col2 = st.columns(2)
+
+                    with chart_col1:
+
+                        fig_depth = go.Figure()
+
+                        fig_depth.add_trace(
+                            go.Scatter(
+                                x=np.arange(
+                                    len(
+                                        route_depth_values
+                                    )
+                                ),
+                                y=route_depth_values,
+                                mode="lines",
+                                fill="tozeroy",
+                                line=dict(
+                                    color=BLUE_3,
+                                    width=2
+                                ),
+                                name="Bed depth"
+                            )
+                        )
+
+                        fig_depth.update_layout(
+                            title="Bathymetry Along Route",
+                            height=350,
+                            xaxis_title="Waypoint",
+                            yaxis_title="Bed elevation (m)",
+                            paper_bgcolor="rgba(0,0,0,0)",
+                            plot_bgcolor="rgba(255,255,255,0.7)",
+                            font=dict(
+                                color=TEXT
+                            )
+                        )
+
+                        st.plotly_chart(
+                            fig_depth,
+                            use_container_width=True,
+                            key="route_depth_chart"
+                        )
+
+                    with chart_col2:
+
+                        fig_env = go.Figure()
+
+                        fig_env.add_trace(
+                            go.Scatter(
+                                x=np.arange(
+                                    len(
+                                        route_ice_values
+                                    )
+                                ),
+                                y=route_ice_values,
+                                mode="lines",
+                                name="Sea Ice"
+                            )
+                        )
+
+                        fig_env.add_trace(
+                            go.Scatter(
+                                x=np.arange(
+                                    len(
+                                        route_current_values
+                                    )
+                                ),
+                                y=route_current_values * 50,
+                                mode="lines",
+                                name="Current × 50"
+                            )
+                        )
+
+                        fig_env.update_layout(
+                            title="Environmental Conditions Along Route",
+                            height=350,
+                            xaxis_title="Waypoint",
+                            yaxis_title="Value",
+                            paper_bgcolor="rgba(0,0,0,0)",
+                            plot_bgcolor="rgba(255,255,255,0.7)",
+                            font=dict(
+                                color=TEXT
+                            )
+                        )
+
+                        st.plotly_chart(
+                            fig_env,
+                            use_container_width=True,
+                            key="route_environment_chart"
+                        )
+
+                    # ------------------------------------------------
+                    # Route report
+                    # ------------------------------------------------
+
+                    report = pd.DataFrame({
+                        "latitude": path_lat,
+                        "longitude": path_lon,
+                        "risk_score": route_risk_values,
+                        "sea_ice_percent": route_ice_values,
+                        "current_speed_ms": route_current_values,
+                        "bed_depth_m": route_depth_values
+                    })
+
+                    st.download_button(
+                        "⬇️ Download Route Assessment",
+                        data=report.to_csv(
+                            index=False
+                        ),
+                        file_name="polarsafe_route_assessment.csv",
+                        mime="text/csv",
+                        use_container_width=True
+                    )
 
 
 # ============================================================
 # FOOTER
 # ============================================================
 
-st.markdown(
-    """
-    <div class="footer">
+st.divider()
 
-    <b>POLAR-SAFE</b> • SIH26059
+st.markdown(
+    f"""
+    <div style="
+        text-align:center;
+        padding:15px;
+        color:{MUTED};
+        font-size:12px;
+    ">
+
+    <b style="color:{BLUE};">
+    POLARSAFE
+    </b>
+
+    · Antarctic Environmental Risk Explorer
 
     <br>
 
-    Antarctic Environmental Risk & Navigation
-    Decision-Support Prototype
-
-    <br><br>
-
-    Designed for demonstration and research.
-    Final navigation decisions remain with qualified operators.
+    BedMachine Antarctica · NOAA CoastWatch · NASA SCP
 
     </div>
     """,
